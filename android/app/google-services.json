@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "211885957058",
+    "project_id": "bullbearnews-4eff4",
+    "storage_bucket": "bullbearnews-4eff4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:211885957058:android:7727fbf566e4ff9d87405b",
+        "android_client_info": {
+          "package_name": "com.example.bullbearnews"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC3QoDXsOi3CQTOGi6LaSMautk6NzWki-g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

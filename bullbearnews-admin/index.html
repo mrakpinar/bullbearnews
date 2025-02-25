@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BullBearNews Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header class="my-4">
+            <h1>BullBearNews Admin Panel</h1>
+            <div id="auth-status" class="mb-3">
+                <div id="login-container">
+                    <button id="login-button" class="btn btn-primary">Giriş Yap</button>
+                </div>
+                <div id="user-info" class="d-none">
+                    <span id="user-email"></span>
+                    <button id="logout-button" class="btn btn-outline-danger btn-sm ms-2">Çıkış Yap</button>
+                </div>
+            </div>
+        </header>
+
+        <div id="auth-required" class="alert alert-warning d-none">
+            Haber eklemek için giriş yapmalısınız.
+        </div>
+
+        <div id="admin-content" class="d-none">
+            <!-- Haber Ekleme Formu -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Yeni Haber Ekle</h3>
+                </div>
+                <div class="card-body">
+                    <form id="news-form">
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Başlık</label>
+                            <input type="text" class="form-control" id="title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="content" class="form-label">İçerik</label>
+                            <textarea class="form-control" id="content" rows="6" required></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="category" class="form-label">Kategori</label>
+                                <select class="form-select" id="category" required>
+                                    <option value="Trending">Trending</option>
+                                    <option value="New">New</option>
+                                    <option value="Teknoloji">Teknoloji</option>
+                                    <option value="Sağlık">Sağlık</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="author" class="form-label">Yazar</label>
+                                <input type="text" class="form-control" id="author" required>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="image" class="form-label">Haber Görseli</label>
+                            <input type="file" class="form-control" id="image" accept="image/*" required>
+                            <div class="mt-2">
+                                <img id="image-preview" class="img-fluid d-none" alt="Görsel Önizleme">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-success" id="submit-button">Haberi Yayınla</button>
+                        <div id="upload-progress" class="progress mt-3 d-none">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Haber Listesi -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3>Haberler</h3>
+                    <button id="refresh-button" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-arrow-clockwise"></i> Yenile
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Görsel</th>
+                                    <th>Başlık</th>
+                                    <th>Kategori</th>
+                                    <th>Tarih</th>
+                                    <th>Yazar</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="news-list">
+                                <!-- JavaScript ile doldurulacak -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="loading-news" class="text-center py-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Yükleniyor...</span>
+                        </div>
+                    </div>
+                    <div id="no-news" class="alert alert-info d-none">
+                        Henüz haber bulunmuyor.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Haberi Sil</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    Bu haberi silmek istediğinize emin misiniz?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete">Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
+    <script src="https://upload.cloudinary.com/v1_1/dh7lpyg7t/js/upload.js"></script>
+    
+    <!-- Bootstrap -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+</body>
+</html>
