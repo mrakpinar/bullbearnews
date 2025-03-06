@@ -1,16 +1,16 @@
+import 'package:bullbearnews/screens/chat_screen.dart';
 import 'package:flutter/material.dart';
 import '../models/chat_room_model.dart';
-import '../screens/chat_screen.dart';
 import '../services/chat_service.dart';
 
-class CommunityScreen extends StatefulWidget {
-  const CommunityScreen({super.key});
+class ChatRoomsScreen extends StatefulWidget {
+  const ChatRoomsScreen({super.key});
 
   @override
-  _CommunityScreenState createState() => _CommunityScreenState();
+  _ChatRoomsScreenState createState() => _ChatRoomsScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
+class _ChatRoomsScreenState extends State<ChatRoomsScreen> {
   final ChatService _chatService = ChatService();
 
   @override
@@ -20,7 +20,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Community'),
+        title: const Text('Sohbet Odaları'),
         centerTitle: true,
         elevation: 0,
       ),

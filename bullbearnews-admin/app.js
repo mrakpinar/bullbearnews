@@ -46,6 +46,18 @@ const noNews = document.getElementById('no-news');
 const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
 const confirmDeleteButton = document.getElementById('confirm-delete');
 
+// DOM elemanları - Chat Odaları
+const chatRoomForm = document.getElementById('chat-room-form');
+const roomNameInput = document.getElementById('room-name');
+const roomDescriptionInput = document.getElementById('room-description');
+const addRoomButton = document.getElementById('add-room-button');
+const refreshChatRoomsButton = document.getElementById('refresh-chat-rooms');
+const chatRoomsList = document.getElementById('chat-rooms-list');
+const loadingChatRooms = document.getElementById('loading-chat-rooms');
+const noChatRooms = document.getElementById('no-chat-rooms');
+const deleteRoomModal = new bootstrap.Modal(document.getElementById('deleteRoomModal'));
+const confirmDeleteRoomButton = document.getElementById('confirm-delete-room');
+
 // Auth durum değişikliğini izle
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -270,5 +282,183 @@ confirmDeleteButton.addEventListener('click', async () => {
         alert('Haber silinirken bir hata oluştu: ' + error.message);
     } finally {
         deleteModal.hide();
+    }
+});
+
+
+// Chat odalarını yükle
+async function loadChatRooms() {
+    if (!auth.currentUser) return;
+    
+    loadingChatRooms.classList.remove('d-none');
+    noChatRooms.classList.add('d-none');
+    chatRoomsList.innerHTML = '';
+    
+    try {
+        const snapshot = await db.collection('chatRooms')
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            noChatRooms.classList.remove('d-none');
+        } else {
+            for (const doc of snapshot.docs) {
+                const room = doc.data();
+                room.id = doc.id;
+                
+                // Tarih formatla
+                let formattedDate = 'Tarih bilgisi yok';
+                if (room.createdAt) {
+                    const date = room.createdAt.toDate();
+                    formattedDate = `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+                }
+                
+                // Mesaj sayısını al
+                const messagesSnapshot = await db.collection('chatRooms')
+                    .doc(room.id)
+                    .collection('messages')
+                    .get();
+                
+                const messageCount = messagesSnapshot.size;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${room.name}</td>
+                    <td>${room.description}</td>
+                    <td>${formattedDate}</td>
+                    <td>${messageCount}</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger delete-room" data-id="${room.id}">Sil</button>
+                    </td>
+                `;
+                
+                chatRoomsList.appendChild(row);
+            }
+            
+            // Silme butonlarına event listener ekle
+            document.querySelectorAll('.delete-room').forEach(button => {
+                button.addEventListener('click', event => {
+                    const roomId = event.target.getAttribute('data-id');
+                    confirmDeleteRoomButton.setAttribute('data-id', roomId);
+                    deleteRoomModal.show();
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Sohbet odası yükleme hatası:', error);
+        alert('Sohbet odaları yüklenirken bir hata oluştu: ' + error.message);
+    } finally {
+        loadingChatRooms.classList.add('d-none');
+    }
+}
+
+// Oda ekleme formu
+chatRoomForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    
+    if (!auth.currentUser) {
+        alert('Sohbet odası eklemek için giriş yapmalısınız.');
+        return;
+    }
+    
+    // Form verilerini al
+    const name = roomNameInput.value.trim();
+    const description = roomDescriptionInput.value.trim();
+    
+    if (!name || !description) {
+        alert('Lütfen tüm alanları doldurun.');
+        return;
+    }
+    
+    try {
+        // UI güncellemeleri
+        addRoomButton.disabled = true;
+        
+        // Oda adının benzersiz olduğundan emin ol
+        const roomSnapshot = await db.collection('chatRooms')
+            .where('name', '==', name)
+            .get();
+        
+        if (!roomSnapshot.empty) {
+            alert('Bu isimde bir sohbet odası zaten mevcut. Lütfen farklı bir isim seçin.');
+            addRoomButton.disabled = false;
+            return;
+        }
+        
+        // Firestore'a odayı ekle
+        await db.collection('chatRooms').add({
+            name,
+            description,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: auth.currentUser.uid,
+            createdByEmail: auth.currentUser.email
+        });
+        
+        alert('Sohbet odası başarıyla eklendi.');
+        
+        // Formu sıfırla
+        chatRoomForm.reset();
+        
+        // UI'ı güncelle
+        addRoomButton.disabled = false;
+
+        // Oda listesini yenile
+        loadChatRooms();
+    } catch (error) {
+        console.error('Sohbet odası ekleme hatası:', error);
+        alert('Sohbet odası eklenirken bir hata oluştu: ' + error.message);
+        addRoomButton.disabled = false;
+    }
+});
+
+// Yenile butonuna tıklama
+refreshChatRoomsButton.addEventListener('click', loadChatRooms);
+
+// Oda silme işlemi
+confirmDeleteRoomButton.addEventListener('click', async () => {
+    const roomId = confirmDeleteRoomButton.getAttribute('data-id');
+    
+    if (!roomId) {
+        deleteRoomModal.hide();
+        return;
+    }
+    
+    try {
+        // Önce odaya ait tüm mesajları sil
+        const messagesSnapshot = await db.collection('chatRooms')
+            .doc(roomId)
+            .collection('messages')
+            .get();
+        
+        const batch = db.batch();
+        messagesSnapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        // Batch işlemi gerçekleştir
+        await batch.commit();
+        
+        // Sonra odanın kendisini sil
+        await db.collection('chatRooms').doc(roomId).delete();
+        
+        alert('Sohbet odası başarıyla silindi.');
+        loadChatRooms();
+    } catch (error) {
+        console.error('Sohbet odası silme hatası:', error);
+        alert('Sohbet odası silinirken bir hata oluştu: ' + error.message);
+    } finally {
+        deleteRoomModal.hide();
+    }
+});
+
+// Auth durum değişikliğinde chat odalarını da yükle
+auth.onAuthStateChanged(user => {
+    // Mevcut kod...
+    if (user) {
+        // ... diğer yükleme işlemleri ...
+        loadNews();
+        loadChatRooms(); // Chat odalarını da yükle
+    } else {
+        // ... mevcut kod ...
     }
 });
