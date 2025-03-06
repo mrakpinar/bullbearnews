@@ -92,7 +92,7 @@ class MyApp extends StatelessWidget {
         ),
         textTheme: ThemeData.dark()
             .textTheme
-            .apply(fontFamily: "Barlow"), // Koyu tema için de aynı font
+            .apply(fontFamily: "DMSerif"), // Koyu tema için de aynı font
         appBarTheme: const AppBarTheme(
           centerTitle: true,
           elevation: 0,

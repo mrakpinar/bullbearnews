@@ -1,4 +1,5 @@
 import 'package:bullbearnews/screens/new_details_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/news_model.dart';
 
@@ -44,38 +45,26 @@ class NewsCard extends StatelessWidget {
                 alignment: Alignment.center,
                 children: [
                   // Yükleme sırasında CircularProgressIndicator göstermek için
-                  Image.network(
-                    news.imageUrl,
+                  CachedNetworkImage(
+                    imageUrl: news.imageUrl,
                     width: width,
                     height: 120,
                     fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) {
-                        return child; // Görsel tamamen yüklendiğinde direkt göster
-                      }
-                      return Container(
-                        width: width,
-                        height: 120,
-                        color: Colors.grey[200], // Arka plan
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    (loadingProgress.expectedTotalBytes ?? 1)
-                                : null,
-                          ),
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        width: width,
-                        height: 120,
-                        color: Colors.grey[300],
-                        child: Icon(Icons.image, color: Colors.grey[600]),
-                      );
-                    },
-                  ),
+                    placeholder: (context, url) => Container(
+                      width: width,
+                      height: 120,
+                      color: Colors.grey[200],
+                      child: Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: width,
+                      height: 120,
+                      color: Colors.grey[300],
+                      child: Icon(Icons.image, color: Colors.grey[600]),
+                    ),
+                  )
                 ],
               ),
             ),
