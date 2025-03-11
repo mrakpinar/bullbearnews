@@ -17,7 +17,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // İstenen özel renk tonu
+    // renk tonu
     final customPurple = const Color(0xFFBB86FC);
 
     return Scaffold(
@@ -104,13 +104,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             // 3 boyutlu etkiyi artırmak için daha belirgin gölgeler
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: customPurple.withOpacity(0.2),
                                 blurRadius: 15,
                                 spreadRadius: 1,
-                                offset: const Offset(5, 5),
+                                offset: const Offset(5, 6),
                               ),
                               BoxShadow(
-                                color: Colors.grey.withOpacity(0.5),
+                                color: customPurple.withOpacity(0.5),
                                 blurRadius: 2,
                                 spreadRadius: 0,
                                 offset: const Offset(0, 1),
@@ -131,19 +131,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   padding: const EdgeInsets.all(10),
                                   decoration: BoxDecoration(
                                     color: customPurple.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(12),
                                     // İkon konteynerını da 3 boyutlu göstermek için
                                     boxShadow: [
                                       BoxShadow(
-                                        color: customPurple.withOpacity(0.2),
+                                        color: customPurple.withOpacity(0.1),
                                         blurRadius: 8,
                                         spreadRadius: 1,
-                                        offset: const Offset(2, 2),
+                                        offset: const Offset(1, 1),
                                       ),
                                     ],
                                   ),
                                   child: Icon(
-                                    Icons.family_restroom_sharp,
+                                    Icons.mode_comment_rounded,
                                     color: customPurple,
                                     size: 30,
                                   ),
@@ -173,7 +173,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 // Katılım sayısı veya aktif kişi göstergesi
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: customPurple.withOpacity(0.1),
                                     borderRadius: BorderRadius.circular(12),

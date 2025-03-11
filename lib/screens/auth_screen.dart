@@ -118,15 +118,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
       // Firebase hata mesajlarını daha anlaşılır hale getirme
       if (message.contains('user-not-found')) {
-        message = 'Bu e-posta adresiyle kayıtlı kullanıcı bulunamadı.';
+        message = 'Can\'t find a user with this e-mail address.';
       } else if (message.contains('wrong-password')) {
-        message = 'Hatalı şifre.';
+        message = 'Wrong password.';
       } else if (message.contains('email-already-in-use')) {
-        message = 'Bu e-posta adresi zaten kullanımda.';
+        message = 'This e-mail address is already in use.';
       } else if (message.contains('weak-password')) {
-        message = 'Şifre çok zayıf. Daha güçlü bir şifre belirleyin.';
+        message = 'Password is too weak.';
       } else if (message.contains('network-request-failed')) {
-        message = 'İnternet bağlantınızı kontrol edin.';
+        message = 'Please check your internet connection.';
       }
 
       setState(() {
@@ -146,14 +146,7 @@ class _AuthScreenState extends State<AuthScreen> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.8),
-              Theme.of(context).colorScheme.primary.withOpacity(0.6),
-            ],
-          ),
+          color: Colors.black26,
         ),
         child: SafeArea(
           child: Center(
@@ -164,7 +157,7 @@ class _AuthScreenState extends State<AuthScreen> {
                   width: deviceSize.width > 600 ? 500 : deviceSize.width * 0.9,
                   padding: const EdgeInsets.all(16.0),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Colors.black,
                     borderRadius: BorderRadius.circular(20),
                     boxShadow: [
                       BoxShadow(
@@ -180,16 +173,16 @@ class _AuthScreenState extends State<AuthScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         // Uygulama Logo ve Başlık
-                        Icon(
-                          Icons.newspaper,
-                          size: 70,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                        SizedBox(height: 8),
+                        // Icon(
+                        //   Icons.newspaper,
+                        //   size: 70,
+                        //   color: Theme.of(context).colorScheme.primary,
+                        // ),
+                        // SizedBox(height: 8),
                         Text(
-                          'BullBearNews',
+                          'BBN',
                           style: TextStyle(
-                            fontSize: 24,
+                            fontSize: 36,
                             fontWeight: FontWeight.bold,
                             color: Theme.of(context).colorScheme.primary,
                           ),
@@ -198,9 +191,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
                         // Form Başlığı
                         Text(
-                          _isLogin ? 'Giriş Yap' : 'Hesap Oluştur',
+                          _isLogin ? 'Login' : 'Register',
                           style: TextStyle(
-                            fontSize: 20,
+                            fontSize: 16,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -210,7 +203,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (!_isLogin)
                           TextFormField(
                             decoration: InputDecoration(
-                              labelText: 'Ad Soyad',
+                              labelText: 'Name-Surname',
                               prefixIcon: Icon(Icons.person_outline),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -222,7 +215,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             validator: (value) {
                               if (!_isLogin &&
                                   (value == null || value.trim().isEmpty)) {
-                                return 'Lütfen adınızı girin';
+                                return 'Please enter your name';
                               }
                               return null;
                             },
@@ -233,7 +226,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         // E-posta Alanı
                         TextFormField(
                           decoration: InputDecoration(
-                            labelText: 'E-posta',
+                            labelText: 'E-mail',
                             prefixIcon: Icon(Icons.email_outlined),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -245,10 +238,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           textCapitalization: TextCapitalization.none,
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'E-posta gerekli';
+                              return 'E-mail is required';
                             }
                             if (!value.contains('@') || !value.contains('.')) {
-                              return 'Geçerli bir e-posta girin';
+                              return 'Enter a valid e-mail address';
                             }
                             return null;
                           },
@@ -259,7 +252,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         // Şifre Alanı
                         TextFormField(
                           decoration: InputDecoration(
-                            labelText: 'Şifre',
+                            labelText: 'Password',
                             prefixIcon: Icon(Icons.lock_outline),
                             suffixIcon: IconButton(
                               icon: Icon(
@@ -282,10 +275,10 @@ class _AuthScreenState extends State<AuthScreen> {
                           obscureText: _obscurePassword,
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Şifre gerekli';
+                              return 'Password is required';
                             }
                             if (!_isLogin && value.length < 6) {
-                              return 'Şifre en az 6 karakter olmalı';
+                              return 'Password must be at least 6 characters';
                             }
                             return null;
                           },
@@ -302,7 +295,7 @@ class _AuthScreenState extends State<AuthScreen> {
                                 foregroundColor:
                                     Theme.of(context).colorScheme.primary,
                               ),
-                              child: Text('Şifremi Unuttum'),
+                              child: Text('Forgot Password?'),
                             ),
                           ),
 
@@ -344,7 +337,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             child: _isLoading
                                 ? CircularProgressIndicator(color: Colors.white)
                                 : Text(
-                                    _isLogin ? 'GİRİŞ YAP' : 'KAYIT OL',
+                                    _isLogin ? 'LOGIN' : 'REGISTER',
                                     style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold),
@@ -360,14 +353,14 @@ class _AuthScreenState extends State<AuthScreen> {
                           children: [
                             Text(
                               _isLogin
-                                  ? 'Hesabın yok mu?'
-                                  : 'Zaten hesabın var mı?',
+                                  ? 'Don\'t have an account?'
+                                  : 'Already have an account?',
                               style: TextStyle(color: Colors.grey.shade700),
                             ),
                             TextButton(
                               onPressed: _switchAuthMode,
                               child: Text(
-                                _isLogin ? 'Kayıt Ol' : 'Giriş Yap',
+                                _isLogin ? 'Register' : 'Login',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   color: Theme.of(context).colorScheme.primary,
