@@ -26,7 +26,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadFavoriteCryptos() async {
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       // Tüm kripto verilerini al
       final List<CryptoModel> allCryptos = await _cryptoService.getCryptoData();
@@ -44,11 +47,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // Market cap'e göre sırala
       _favoriteCryptos.sort((a, b) => b.marketCap.compareTo(a.marketCap));
     } catch (e) {
-      setState(() {
-        _errorMessage = 'An error occurred while loading favorites: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An error occurred while loading favorites: $e';
+        });
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -66,27 +73,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await prefs.setStringList('favoriteCryptos', favoriteIds);
 
       // UI'ı güncelle
-      setState(() {
-        _favoriteCryptos.removeWhere((crypto) => crypto.id == cryptoId);
-      });
+      if (mounted) {
+        setState(() {
+          _favoriteCryptos.removeWhere((crypto) => crypto.id == cryptoId);
+        });
 
-      // İşlem başarılı bildirimi göster
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Crypto removed from favorites.'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+        // İşlem başarılı bildirimi göster
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Crypto removed from favorites.'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       // Hata durumunda bildirim göster
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An error occured while loading favorites: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occured while loading favorites: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 

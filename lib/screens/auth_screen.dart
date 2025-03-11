@@ -19,6 +19,7 @@ class _AuthScreenState extends State<AuthScreen> {
   String _email = '';
   String _password = '';
   String _name = '';
+  String _nickname = '';
   String _errorMessage = '';
 
   void _switchAuthMode() {
@@ -34,17 +35,17 @@ class _AuthScreenState extends State<AuthScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Şifre Sıfırlama'),
+        title: Text('Reset Password'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-                'E-posta adresinize şifre sıfırlama bağlantısı gönderilecektir.'),
+                'Enter your email address to reset your password. We will send the link to your email address.'),
             SizedBox(height: 16),
             TextField(
               controller: emailController,
               decoration: InputDecoration(
-                labelText: 'E-posta',
+                labelText: 'E-mail',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.emailAddress,
@@ -54,14 +55,14 @@ class _AuthScreenState extends State<AuthScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: Text('İptal'),
+            child: Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               if (emailController.text.isEmpty ||
                   !emailController.text.contains('@')) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Geçerli bir e-posta adresi girin')),
+                  SnackBar(content: Text('Enter a valid e-mail address')),
                 );
                 return;
               }
@@ -71,7 +72,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Şifre sıfırlama bağlantısı gönderildi'),
+                    content: Text('Password reset link sent to your e-mail.'),
                     backgroundColor: Colors.green,
                   ),
                 );
@@ -79,13 +80,13 @@ class _AuthScreenState extends State<AuthScreen> {
                 Navigator.of(ctx).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Hata: ${e.toString()}'),
+                    content: Text('Error: ${e.toString()}'),
                     backgroundColor: Colors.red,
                   ),
                 );
               }
             },
-            child: Text('Gönder'),
+            child: Text('Send Link'),
           ),
         ],
       ),
@@ -105,10 +106,10 @@ class _AuthScreenState extends State<AuthScreen> {
       if (_isLogin) {
         await _authService.signIn(_email, _password);
       } else {
-        await _authService.signUp(_email, _password, _name);
+        await _authService.signUp(_email, _password, _name, _nickname);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Kayıt başarılı! Otomatik giriş yapılıyor...'),
+            content: Text('Registered successfully!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -222,7 +223,28 @@ class _AuthScreenState extends State<AuthScreen> {
                             onSaved: (value) => _name = value?.trim() ?? '',
                           ),
                         if (!_isLogin) SizedBox(height: 16),
-
+                        // Kullanıcı Adı Alanı (sadece kayıt modunda)
+                        if (!_isLogin)
+                          TextFormField(
+                            decoration: InputDecoration(
+                              labelText: 'Nickname',
+                              prefixIcon: Icon(Icons.alternate_email),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding:
+                                  EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            validator: (value) {
+                              if (!_isLogin &&
+                                  (value == null || value.trim().isEmpty)) {
+                                return 'Please enter a nickname';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) => _nickname = value?.trim() ?? '',
+                          ),
+                        if (!_isLogin) SizedBox(height: 16),
                         // E-posta Alanı
                         TextFormField(
                           decoration: InputDecoration(

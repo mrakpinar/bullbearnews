@@ -47,7 +47,7 @@ class ChatService {
         .add({
       'roomId': roomId,
       'userId': user.uid,
-      'username': user.displayName ?? 'Anonim Kullanıcı',
+      'username': user.email ?? 'Anonim Kullanıcı',
       'userProfileImage': user.photoURL,
       'content': content,
       'timestamp': FieldValue.serverTimestamp(),

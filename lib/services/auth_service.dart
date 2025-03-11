@@ -26,7 +26,8 @@ class AuthService {
   }
 
   // Kayıt ol
-  Future<User?> signUp(String email, String password, String name) async {
+  Future<User?> signUp(
+      String email, String password, String name, String nickname) async {
     try {
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -37,6 +38,7 @@ class AuthService {
       await _firestore.collection('users').doc(result.user!.uid).set({
         'email': email,
         'name': name,
+        'nickname': nickname,
         'createdAt': DateTime.now(),
         'favoriteNews': [],
       });
@@ -72,14 +74,18 @@ class AuthService {
   }
 
   // Profil güncelleme
-  Future<void> updateProfile(String name) async {
+  Future<void> updateProfile(String name, {String? nickname}) async {
     try {
       User? user = _auth.currentUser;
       if (user != null) {
         await user.updateDisplayName(name);
-        await _firestore.collection('users').doc(user.uid).update({
-          'name': name,
-        });
+
+        final updateData = {'name': name};
+        if (nickname != null) {
+          updateData['nickname'] = nickname;
+        }
+
+        await _firestore.collection('users').doc(user.uid).update(updateData);
       }
     } catch (e) {
       print('Profil güncelleme hatası: $e');

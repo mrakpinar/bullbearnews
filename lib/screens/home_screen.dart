@@ -31,7 +31,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadNews() async {
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       if (_selectedCategory == 'All') {
         _allNews = await _newsService.getNews();
@@ -43,7 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
         print('Haber yükleme hatası: $e');
       }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

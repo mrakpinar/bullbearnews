@@ -79,12 +79,12 @@ class _ChatScreenState extends State<ChatScreen> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Henüz mesaj yok',
+                          'No messages yet.',
                           style: theme.textTheme.titleMedium,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Konuşmayı başlatan ilk kişi siz olun!',
+                          'Be the first to start the conversation!',
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.brightness == Brightness.dark
                                 ? Colors.grey[400]
@@ -242,7 +242,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: TextField(
                     controller: _messageController,
                     decoration: InputDecoration(
-                      hintText: 'Mesajınızı yazın...',
+                      hintText: 'Enter your message...',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide.none,
