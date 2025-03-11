@@ -54,8 +54,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
-        children: _screens,
-        physics: const PageScrollPhysics(), // Enables swiping between pages
+        physics: const PageScrollPhysics(),
+        children: _screens, // Enables swiping between pages
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
