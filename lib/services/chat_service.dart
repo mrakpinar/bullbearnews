@@ -40,6 +40,11 @@ class ChatService {
     }
 
     final user = _auth.currentUser!;
+
+    // Kullanıcının nickname'ini Firestore'dan çekme
+    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final nickname = userDoc.data()?['nickname'] ?? 'Anonim Kullanıcı';
+
     await _firestore
         .collection('chatRooms')
         .doc(roomId)
@@ -47,7 +52,7 @@ class ChatService {
         .add({
       'roomId': roomId,
       'userId': user.uid,
-      'username': user.email ?? 'Anonim Kullanıcı',
+      'username': nickname, // E-posta yerine nickname kullanıyoruz
       'userProfileImage': user.photoURL,
       'content': content,
       'timestamp': FieldValue.serverTimestamp(),
