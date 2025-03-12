@@ -12,6 +12,7 @@ class CommunityScreen extends StatefulWidget {
 
 class _CommunityScreenState extends State<CommunityScreen> {
   final ChatService _chatService = ChatService();
+  bool _showInactiveRooms = false; // Toggle to show/hide inactive rooms
 
   @override
   Widget build(BuildContext context) {
@@ -19,12 +20,27 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
     // renk tonu
     final customPurple = const Color(0xFFBB86FC);
+    final inactiveColor = Colors.grey; // Color for inactive rooms
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          // Optional: Add a toggle button to show/hide inactive rooms
+          IconButton(
+            icon: Icon(
+                _showInactiveRooms ? Icons.visibility_off : Icons.visibility),
+            tooltip:
+                _showInactiveRooms ? 'Hide inactive rooms' : 'Show all rooms',
+            onPressed: () {
+              setState(() {
+                _showInactiveRooms = !_showInactiveRooms;
+              });
+            },
+          ),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -72,6 +88,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     );
                   }
 
+                  // Filter rooms based on active status if needed
+                  final rooms = _showInactiveRooms
+                      ? snapshot.data!
+                      : snapshot.data!.where((room) => room.isActive).toList();
+
+                  if (rooms.isEmpty) {
+                    return const Center(
+                      child: Text('No active chat rooms available.'),
+                    );
+                  }
+
                   return GridView.builder(
                     padding: const EdgeInsets.only(bottom: 20),
                     gridDelegate:
@@ -81,21 +108,39 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
                     ),
-                    itemCount: snapshot.data!.length,
+                    itemCount: rooms.length,
                     itemBuilder: (context, index) {
-                      final room = snapshot.data![index];
+                      final room = rooms[index];
                       final cardColor = theme.brightness == Brightness.dark
                           ? Colors.grey[850]
                           : Colors.white;
 
+                      // Choose colors based on active status
+                      final roomColor =
+                          room.isActive ? customPurple : inactiveColor;
+                      final statusText = room.isActive ? 'Active' : 'Passive';
+
                       return GestureDetector(
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ChatScreen(chatRoom: room),
-                            ),
-                          );
+                          // Only allow navigation to active rooms
+                          if (room.isActive) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ChatScreen(chatRoom: room),
+                              ),
+                            );
+                          } else {
+                            // Optionally show message for inactive rooms
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content:
+                                    Text('This room is currently inactive.'),
+                                backgroundColor: inactiveColor,
+                              ),
+                            );
+                          }
                         },
                         child: Container(
                           decoration: BoxDecoration(
@@ -104,103 +149,112 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             // 3 boyutlu etkiyi artırmak için daha belirgin gölgeler
                             boxShadow: [
                               BoxShadow(
-                                color: customPurple.withOpacity(0.2),
+                                color: roomColor.withOpacity(0.2),
                                 blurRadius: 15,
                                 spreadRadius: 1,
                                 offset: const Offset(5, 6),
                               ),
                               BoxShadow(
-                                color: customPurple.withOpacity(0.5),
+                                color: roomColor.withOpacity(0.5),
                                 blurRadius: 2,
                                 spreadRadius: 0,
                                 offset: const Offset(0, 1),
                               ),
                             ],
                             border: Border.all(
-                              color: customPurple.withOpacity(0.2),
+                              color: roomColor.withOpacity(0.2),
                               width: 1.5,
                             ),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Oda ikonunu daha belirgin hale getirme
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: customPurple.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(12),
-                                    // İkon konteynerını da 3 boyutlu göstermek için
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: customPurple.withOpacity(0.1),
-                                        blurRadius: 8,
-                                        spreadRadius: 1,
-                                        offset: const Offset(1, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Icon(
-                                    Icons.mode_comment_rounded,
-                                    color: customPurple,
-                                    size: 30,
-                                  ),
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  room.name,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 8),
-                                Expanded(
-                                  child: Text(
-                                    room.description,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.brightness == Brightness.dark
-                                          ? Colors.grey[400]
-                                          : Colors.grey[600],
+                          // Apply opacity to inactive rooms
+                          child: Opacity(
+                            opacity: room.isActive ? 1.0 : 0.7,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Oda ikonunu daha belirgin hale getirme
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: roomColor.withOpacity(0.15),
+                                      borderRadius: BorderRadius.circular(12),
+                                      // İkon konteynerını da 3 boyutlu göstermek için
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: roomColor.withOpacity(0.1),
+                                          blurRadius: 8,
+                                          spreadRadius: 1,
+                                          offset: const Offset(1, 1),
+                                        ),
+                                      ],
                                     ),
-                                    maxLines: 3,
+                                    child: Icon(
+                                      Icons.mode_comment_rounded,
+                                      color: roomColor,
+                                      size: 30,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  Text(
+                                    room.name,
+                                    style:
+                                        theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
-                                ),
-                                // Katılım sayısı veya aktif kişi göstergesi
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: customPurple.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.person,
-                                        size: 14,
-                                        color: customPurple,
+                                  const SizedBox(height: 8),
+                                  Expanded(
+                                    child: Text(
+                                      room.description,
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                        color:
+                                            theme.brightness == Brightness.dark
+                                                ? Colors.grey[400]
+                                                : Colors.grey[600],
                                       ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Active',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: customPurple,
-                                          fontWeight: FontWeight.w500,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  // Katılım sayısı veya aktif kişi göstergesi
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: roomColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          room.isActive
+                                              ? Icons.person
+                                              : Icons.person_off,
+                                          size: 14,
+                                          color: roomColor,
                                         ),
-                                      ),
-                                    ],
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          statusText,
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: roomColor,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),

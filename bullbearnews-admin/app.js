@@ -57,6 +57,8 @@ const loadingChatRooms = document.getElementById('loading-chat-rooms');
 const noChatRooms = document.getElementById('no-chat-rooms');
 const deleteRoomModal = new bootstrap.Modal(document.getElementById('deleteRoomModal'));
 const confirmDeleteRoomButton = document.getElementById('confirm-delete-room');
+const clearMessagesModal = new bootstrap.Modal(document.getElementById('clearMessagesModal'));
+const confirmClearMessagesButton = document.getElementById('confirm-clear-messages');
 
 // Auth durum değişikliğini izle
 auth.onAuthStateChanged(user => {
@@ -67,6 +69,7 @@ auth.onAuthStateChanged(user => {
         authRequired.classList.add('d-none');
         adminContent.classList.remove('d-none');
         loadNews();
+        loadChatRooms();
     } else {
         loginContainer.classList.remove('d-none');
         userInfo.classList.add('d-none');
@@ -321,6 +324,13 @@ async function loadChatRooms() {
                 
                 const messageCount = messagesSnapshot.size;
                 
+                // Odanın aktiflik durumu (yoksa varsayılan olarak true)
+                const isActive = room.isActive !== undefined ? room.isActive : true;
+                const statusClass = isActive ? 'bg-success' : 'bg-danger';
+                const statusText = isActive ? 'Aktif' : 'Pasif';
+                const toggleBtnText = isActive ? 'Devre Dışı Bırak' : 'Aktifleştir';
+                const toggleBtnClass = isActive ? 'btn-warning' : 'btn-success';
+                
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${room.name}</td>
@@ -328,7 +338,20 @@ async function loadChatRooms() {
                     <td>${formattedDate}</td>
                     <td>${messageCount}</td>
                     <td>
-                        <button class="btn btn-sm btn-danger delete-room" data-id="${room.id}">Sil</button>
+                        <span class="badge ${statusClass}">${statusText}</span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-sm ${toggleBtnClass} toggle-room-status" data-id="${room.id}" data-status="${isActive}">
+                                ${toggleBtnText}
+                            </button>
+                            <button class="btn btn-sm btn-info clear-messages" data-id="${room.id}" data-name="${room.name}">
+                                Mesajları Temizle
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-room" data-id="${room.id}">
+                                Odayı Sil
+                            </button>
+                        </div>
                     </td>
                 `;
                 
@@ -341,6 +364,40 @@ async function loadChatRooms() {
                     const roomId = event.target.getAttribute('data-id');
                     confirmDeleteRoomButton.setAttribute('data-id', roomId);
                     deleteRoomModal.show();
+                });
+            });
+            
+            // Aktiflik durumu değiştirme butonlarına event listener ekle
+            document.querySelectorAll('.toggle-room-status').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const roomId = event.target.getAttribute('data-id');
+                    const currentStatus = event.target.getAttribute('data-status') === 'true';
+                    
+                    try {
+                        // Odanın durumunu güncelle
+                        await db.collection('chatRooms').doc(roomId).update({
+                            isActive: !currentStatus
+                        });
+                        
+                        alert(`Oda durumu başarıyla ${!currentStatus ? 'aktif' : 'pasif'} olarak güncellendi.`);
+                        loadChatRooms(); // Listeyi yenile
+                    } catch (error) {
+                        console.error('Oda durumu güncelleme hatası:', error);
+                        alert('Oda durumu güncellenirken bir hata oluştu: ' + error.message);
+                    }
+                });
+            });
+            
+            // Mesajları temizleme butonlarına event listener ekle
+            document.querySelectorAll('.clear-messages').forEach(button => {
+                button.addEventListener('click', event => {
+                    const roomId = event.target.getAttribute('data-id');
+                    const roomName = event.target.getAttribute('data-name');
+                    
+                    // Modal içeriğini güncelle
+                    document.getElementById('room-name-for-clear').textContent = roomName;
+                    confirmClearMessagesButton.setAttribute('data-id', roomId);
+                    clearMessagesModal.show();
                 });
             });
         }
@@ -391,7 +448,8 @@ chatRoomForm.addEventListener('submit', async event => {
             description,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: auth.currentUser.uid,
-            createdByEmail: auth.currentUser.email
+            createdByEmail: auth.currentUser.email,
+            isActive: true // Varsayılan olarak aktif
         });
         
         alert('Sohbet odası başarıyla eklendi.');
@@ -451,14 +509,61 @@ confirmDeleteRoomButton.addEventListener('click', async () => {
     }
 });
 
+// Oda mesajlarını temizleme işlemi
+confirmClearMessagesButton.addEventListener('click', async () => {
+    const roomId = confirmClearMessagesButton.getAttribute('data-id');
+    
+    if (!roomId) {
+        clearMessagesModal.hide();
+        return;
+    }
+    
+    try {
+        // Odaya ait tüm mesajları al
+        const messagesSnapshot = await db.collection('chatRooms')
+            .doc(roomId)
+            .collection('messages')
+            .get();
+        
+        if (messagesSnapshot.empty) {
+            alert('Bu odada silinecek mesaj bulunmuyor.');
+            clearMessagesModal.hide();
+            return;
+        }
+        
+        // Batch işlemi oluştur
+        const batch = db.batch();
+        messagesSnapshot.docs.forEach(doc => {
+            batch.delete(doc.ref);
+        });
+        
+        // Batch işlemi gerçekleştir
+        await batch.commit();
+        
+        alert('Sohbet odasındaki tüm mesajlar başarıyla temizlendi.');
+        loadChatRooms(); // Listeyi yenile
+    } catch (error) {
+        console.error('Mesaj temizleme hatası:', error);
+        alert('Mesajlar temizlenirken bir hata oluştu: ' + error.message);
+    } finally {
+        clearMessagesModal.hide();
+    }
+});
+
 // Auth durum değişikliğinde chat odalarını da yükle
 auth.onAuthStateChanged(user => {
-    // Mevcut kod...
     if (user) {
-        // ... diğer yükleme işlemleri ...
+        loginContainer.classList.add('d-none');
+        userInfo.classList.remove('d-none');
+        userEmail.textContent = user.email;
+        authRequired.classList.add('d-none');
+        adminContent.classList.remove('d-none');
         loadNews();
         loadChatRooms(); // Chat odalarını da yükle
     } else {
-        // ... mevcut kod ...
+        loginContainer.classList.remove('d-none');
+        userInfo.classList.add('d-none');
+        authRequired.classList.remove('d-none');
+        adminContent.classList.add('d-none');
     }
 });

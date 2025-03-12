@@ -22,7 +22,7 @@
             </div>
         </header>
 
-        <div id="auth-required" class="alert alert-warning d-none">
+        <div id="auth-required" class="alert alert-warning">
             Haber eklemek için giriş yapmalısınız.
         </div>
 
@@ -73,7 +73,7 @@
             </div>
 
             <!-- Haber Listesi -->
-            <div class="card">
+            <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3>Haberler</h3>
                     <button id="refresh-button" class="btn btn-outline-primary btn-sm">
@@ -108,6 +108,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Sohbet Odaları -->
             <div class="card mt-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h3>Sohbet Odaları</h3>
@@ -140,6 +142,7 @@
                                     <th>Açıklama</th>
                                     <th>Oluşturulma Tarihi</th>
                                     <th>Mesaj Sayısı</th>
+                                    <th>Durum</th>
                                     <th>İşlemler</th>
                                 </tr>
                             </thead>
@@ -158,29 +161,10 @@
                     </div>
                 </div>
             </div>
-            
-            <!-- Oda Silme Modalı -->
-            <div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title">Sohbet Odasını Sil</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
-                        </div>
-                        <div class="modal-body">
-                            Bu sohbet odasını silmek istediğinize emin misiniz? Tüm mesaj geçmişi de silinecektir.
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
-                            <button type="button" class="btn btn-danger" id="confirm-delete-room">Sil</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
 
-    <!-- Modal -->
+    <!-- Haber Silme Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -199,12 +183,50 @@
         </div>
     </div>
 
+    <!-- Oda Silme Modal -->
+    <div class="modal fade" id="deleteRoomModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Sohbet Odasını Sil</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    Bu sohbet odasını silmek istediğinize emin misiniz? Tüm mesaj geçmişi de silinecektir.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-room">Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mesajları Temizleme Modal -->
+    <div class="modal fade" id="clearMessagesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Mesajları Temizle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    <p><strong><span id="room-name-for-clear"></span></strong> odasındaki tüm mesajları temizlemek istediğinize emin misiniz?</p>
+                    <p>Bu işlem geri alınamaz.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-warning" id="confirm-clear-messages">Tüm Mesajları Temizle</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Firebase -->
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-storage-compat.js"></script>
-    <script src="https://upload.cloudinary.com/v1_1/dh7lpyg7t/js/upload.js"></script>
     
     <!-- Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

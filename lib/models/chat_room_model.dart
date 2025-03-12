@@ -8,6 +8,7 @@ class ChatRoom {
   final String createdBy;
   final String createdByEmail;
   final int messageCount;
+  final bool isActive;
 
   ChatRoom({
     required this.id,
@@ -17,11 +18,11 @@ class ChatRoom {
     required this.createdBy,
     required this.createdByEmail,
     this.messageCount = 0,
+    this.isActive = true,
   });
 
   factory ChatRoom.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-
     return ChatRoom(
       id: doc.id,
       name: data['name'] ?? '',
@@ -30,6 +31,7 @@ class ChatRoom {
       createdBy: data['createdBy'] ?? '',
       createdByEmail: data['createdByEmail'] ?? '',
       messageCount: data['messageCount'] ?? 0,
+      isActive: data['isActive'] ?? true, // Load isActive from Firestore
     );
   }
 }
