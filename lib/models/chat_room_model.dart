@@ -9,6 +9,8 @@ class ChatRoom {
   final String createdByEmail;
   final int messageCount;
   final bool isActive;
+  final List<String> users;
+  final List<String> activeUsers;
 
   ChatRoom({
     required this.id,
@@ -19,6 +21,8 @@ class ChatRoom {
     required this.createdByEmail,
     this.messageCount = 0,
     this.isActive = true,
+    this.users = const [],
+    this.activeUsers = const [],
   });
 
   factory ChatRoom.fromFirestore(DocumentSnapshot doc) {
@@ -31,7 +35,9 @@ class ChatRoom {
       createdBy: data['createdBy'] ?? '',
       createdByEmail: data['createdByEmail'] ?? '',
       messageCount: data['messageCount'] ?? 0,
-      isActive: data['isActive'] ?? true, // Load isActive from Firestore
+      isActive: data['isActive'] ?? true,
+      users: List<String>.from(data['users'] ?? []),
+      activeUsers: List<String>.from(data['activeUsers'] ?? []),
     );
   }
 }

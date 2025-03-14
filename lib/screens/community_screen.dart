@@ -118,7 +118,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       // Choose colors based on active status
                       final roomColor =
                           room.isActive ? customPurple : inactiveColor;
-                      final statusText = room.isActive ? 'Active' : 'Passive';
+                      // final statusText = room.isActive ? 'Active' : 'Passive';
+
+                      // Check if the current user has joined the room
+                      final currentUser = _chatService.getCurrentUser();
+                      final hasJoined = currentUser != null &&
+                          room.users.contains(currentUser.uid);
 
                       return GestureDetector(
                         onTap: () {
@@ -243,7 +248,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                         ),
                                         const SizedBox(width: 4),
                                         Text(
-                                          statusText,
+                                          '${room.users.length} / ${room.activeUsers.length}',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: roomColor,
@@ -252,6 +257,22 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                         ),
                                       ],
                                     ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  ElevatedButton(
+                                    onPressed: hasJoined
+                                        ? null // Disable the button if already joined
+                                        : () {
+                                            _chatService.joinRoom(room.id);
+                                          },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: roomColor,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                        hasJoined ? 'Joined' : 'Join Room'),
                                   ),
                                 ],
                               ),

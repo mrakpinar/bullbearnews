@@ -27,6 +27,11 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  void _leaveRoom() {
+    _chatService.leaveRoom(widget.chatRoom.id);
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -37,6 +42,12 @@ class _ChatScreenState extends State<ChatScreen> {
         title: Text(widget.chatRoom.name),
         centerTitle: true,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: _leaveRoom,
+            icon: Icon(Icons.exit_to_app_sharp),
+          ),
+        ],
       ),
       body: Column(
         children: [
