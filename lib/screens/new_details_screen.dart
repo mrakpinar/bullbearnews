@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/news_model.dart';
@@ -42,43 +43,53 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black, // Arka plan rengi siyah
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _news == null
-              ? Center(child: Text('Haber bulunamadı'))
+              ? Center(
+                  child: Text('Haber bulunamadı',
+                      style: TextStyle(color: Colors.white)))
               : CustomScrollView(
                   slivers: [
                     SliverAppBar(
-                      expandedHeight: 250,
+                      expandedHeight: 300,
                       floating: false,
                       pinned: true,
+                      backgroundColor:
+                          Colors.black, // AppBar arka plan rengi siyah
                       flexibleSpace: FlexibleSpaceBar(
-                        title: Container(
-                          padding:
-                              EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Color(0xFF8A2BE2).withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _news!.title,
-                            style: TextStyle(
-                              fontSize: 23,
-                              fontWeight: FontWeight.bold,
+                        background: Stack(
+                          children: [
+                            Center(
+                              child: CachedNetworkImage(
+                                imageUrl: _news!.imageUrl,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Container(
+                                  color: Colors.grey[800],
+                                  child: Center(
+                                      child: CircularProgressIndicator()),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: Colors.grey[800],
+                                  child: Icon(Icons.image,
+                                      size: 50, color: Colors.grey[600]),
+                                ),
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        background: Image.network(
-                          _news!.imageUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: Colors.grey[300],
-                              child: Icon(Icons.image, size: 50),
-                            );
-                          },
+                            Container(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: [
+                                    Colors.black.withOpacity(0.8),
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -91,8 +102,9 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                             Text(
                               _news!.title,
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 28,
                                 fontWeight: FontWeight.bold,
+                                color: Colors.white, // Başlık rengi beyaz
                               ),
                             ),
                             SizedBox(height: 16),
@@ -104,8 +116,8 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                     vertical: 6,
                                   ),
                                   decoration: BoxDecoration(
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
+                                    color: Colors
+                                        .deepPurple, // Kategori etiketi rengi
                                     borderRadius: BorderRadius.circular(20),
                                   ),
                                   child: Text(
@@ -123,19 +135,26 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                 Text(
                                   _formatDate(_news!.publishDate),
                                   style: TextStyle(
-                                    color: Colors.grey[700],
+                                    color: Colors.grey[400], // Tarih rengi gri
                                   ),
                                 ),
                               ],
                             ),
-                            SizedBox(height: 8),
-                            Divider(),
-                            SizedBox(height: 8),
+                            SizedBox(height: 24),
+                            Text(
+                              _news!.content,
+                              style: TextStyle(
+                                fontSize: 16,
+                                height: 1.6,
+                                color: Colors.white, // İçerik rengi beyaz
+                              ),
+                            ),
+                            SizedBox(height: 32),
                             Row(
                               children: [
                                 CircleAvatar(
                                   backgroundColor:
-                                      Theme.of(context).colorScheme.primary,
+                                      Colors.deepPurple, // Yazar avatar rengi
                                   child: Text(
                                     _news!.author.isNotEmpty
                                         ? _news!.author[0].toUpperCase()
@@ -144,21 +163,28 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                   ),
                                 ),
                                 SizedBox(width: 12),
-                                Text(
-                                  'Author: ${_news!.author}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Author',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[
+                                            400], // Yazar etiketi rengi gri
+                                      ),
+                                    ),
+                                    Text(
+                                      _news!.author,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors
+                                            .white, // Yazar adı rengi beyaz
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
-                            ),
-                            SizedBox(height: 16),
-                            Text(
-                              _news!.content,
-                              style: TextStyle(
-                                fontSize: 16,
-                                height: 1.6,
-                              ),
                             ),
                             SizedBox(height: 32),
                           ],

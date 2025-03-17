@@ -1,3 +1,4 @@
+// profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
@@ -5,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/theme_provider.dart';
 import '../models/crypto_model.dart';
 import '../services/crypto_service.dart';
+import 'crypto_detail_screen.dart'; // CryptoDetailScreen'i ekleyin
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -384,7 +386,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                             ],
                                           ),
                                           onTap: () {
-                                            // Kripto detay sayfasına yönlendirme yapılabilir
+                                            // Kripto detay sayfasına yönlendirme
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    CryptoDetailScreen(
+                                                        crypto: crypto),
+                                              ),
+                                            );
                                           },
                                         ),
                                       );

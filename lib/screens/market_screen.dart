@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/crypto_model.dart';
@@ -243,149 +244,165 @@ class _MarketScreenState extends State<MarketScreen> {
                                 final isPositive =
                                     crypto.priceChangePercentage24h >= 0;
 
-                                return Card(
-                                  margin: const EdgeInsets.symmetric(
-                                      horizontal: 16, vertical: 8),
-                                  elevation: 2,
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(12.0),
-                                    child: Row(
-                                      children: [
-                                        // Leading - Crypto image
-                                        SizedBox(
-                                          width: 40,
-                                          height: 40,
-                                          child: Image.network(
-                                            crypto.image,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                              return const Icon(
-                                                  Icons.currency_bitcoin,
-                                                  size: 40);
-                                            },
+                                return InkWell(
+                                  onTap: () {
+                                    // Coin detay sayfasına yönlendir
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            CryptoDetailScreen(crypto: crypto),
+                                      ),
+                                    );
+                                  },
+                                  child: Card(
+                                    margin: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 8),
+                                    elevation: 2,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Row(
+                                        children: [
+                                          // Leading - Crypto image
+                                          SizedBox(
+                                            width: 40,
+                                            height: 40,
+                                            child: Image.network(
+                                              crypto.image,
+                                              errorBuilder:
+                                                  (context, error, stackTrace) {
+                                                return const Icon(
+                                                    Icons.currency_bitcoin,
+                                                    size: 40);
+                                              },
+                                            ),
                                           ),
-                                        ),
 
-                                        const SizedBox(width: 12),
-                                        // Middle - Crypto name, symbol, market cap
-                                        Flexible(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: Text(
-                                                      crypto.name,
-                                                      style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(width: 8),
-                                                  Text(
-                                                    crypto.symbol.toUpperCase(),
-                                                    style: TextStyle(
-                                                      color: isDarkMode
-                                                          ? Colors.grey[400]
-                                                          : Colors.grey[600],
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              Text(
-                                                'Market Cap: \$${_formatNumber(crypto.marketCap)}',
-                                                style: TextStyle(
-                                                  fontSize: 12,
-                                                  color: isDarkMode
-                                                      ? Colors.grey[400]
-                                                      : Colors.grey[600],
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-
-                                        // Right side - Price and change percentage
-                                        Expanded(
-                                          flex: 2,
-                                          child: Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.end,
-                                            children: [
-                                              Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.end,
-                                                children: [
-                                                  Text(
-                                                    '\$${formatPrice(crypto.currentPrice)}',
-                                                    style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.bold,
-                                                      fontSize: 16,
-                                                    ),
-                                                    overflow:
-                                                        TextOverflow.ellipsis,
-                                                  ),
-                                                  Row(
-                                                    mainAxisSize:
-                                                        MainAxisSize.min,
-                                                    children: [
-                                                      Icon(
-                                                        isPositive
-                                                            ? Icons.arrow_upward
-                                                            : Icons
-                                                                .arrow_downward,
-                                                        color: isPositive
-                                                            ? Colors.green
-                                                            : Colors.red,
-                                                        size: 16,
-                                                      ),
-                                                      Text(
-                                                        '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
-                                                        style: TextStyle(
-                                                          color: isPositive
-                                                              ? Colors.green
-                                                              : Colors.red,
-                                                          fontSize: 14,
-                                                        ),
+                                          const SizedBox(width: 12),
+                                          // Middle - Crypto name, symbol, market cap
+                                          Flexible(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        crypto.name,
+                                                        style: const TextStyle(
+                                                            fontWeight:
+                                                                FontWeight
+                                                                    .bold),
                                                         overflow: TextOverflow
                                                             .ellipsis,
                                                       ),
-                                                    ],
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(width: 4),
-                                              // Favorite button
-                                              IconButton(
-                                                icon: Icon(
-                                                  crypto.isFavorite
-                                                      ? Icons.star
-                                                      : Icons.star_border,
-                                                  color: crypto.isFavorite
-                                                      ? Colors.amber
-                                                      : isDarkMode
-                                                          ? Colors.white
-                                                          : Colors.grey,
+                                                    ),
+                                                    const SizedBox(width: 8),
+                                                    Text(
+                                                      crypto.symbol
+                                                          .toUpperCase(),
+                                                      style: TextStyle(
+                                                        color: isDarkMode
+                                                            ? Colors.grey[400]
+                                                            : Colors.grey[600],
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                                onPressed: () {
-                                                  _toggleFavorite(crypto.id);
-                                                },
-                                                padding: EdgeInsets.zero,
-                                                constraints:
-                                                    const BoxConstraints(),
-                                                iconSize: 20,
-                                              ),
-                                            ],
+                                                Text(
+                                                  'Market Cap: \$${_formatNumber(crypto.marketCap)}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDarkMode
+                                                        ? Colors.grey[400]
+                                                        : Colors.grey[600],
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+
+                                          // Right side - Price and change percentage
+                                          Expanded(
+                                            flex: 2,
+                                            child: Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.end,
+                                              children: [
+                                                Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.end,
+                                                  children: [
+                                                    Text(
+                                                      '\$${formatPrice(crypto.currentPrice)}',
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 16,
+                                                      ),
+                                                      overflow:
+                                                          TextOverflow.ellipsis,
+                                                    ),
+                                                    Row(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        Icon(
+                                                          isPositive
+                                                              ? Icons
+                                                                  .arrow_upward
+                                                              : Icons
+                                                                  .arrow_downward,
+                                                          color: isPositive
+                                                              ? Colors.green
+                                                              : Colors.red,
+                                                          size: 16,
+                                                        ),
+                                                        Text(
+                                                          '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                                                          style: TextStyle(
+                                                            color: isPositive
+                                                                ? Colors.green
+                                                                : Colors.red,
+                                                            fontSize: 14,
+                                                          ),
+                                                          overflow: TextOverflow
+                                                              .ellipsis,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+                                                const SizedBox(width: 4),
+                                                // Favorite button
+                                                IconButton(
+                                                  icon: Icon(
+                                                    crypto.isFavorite
+                                                        ? Icons.star
+                                                        : Icons.star_border,
+                                                    color: crypto.isFavorite
+                                                        ? Colors.amber
+                                                        : isDarkMode
+                                                            ? Colors.white
+                                                            : Colors.grey,
+                                                  ),
+                                                  onPressed: () {
+                                                    _toggleFavorite(crypto.id);
+                                                  },
+                                                  padding: EdgeInsets.zero,
+                                                  constraints:
+                                                      const BoxConstraints(),
+                                                  iconSize: 20,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 );

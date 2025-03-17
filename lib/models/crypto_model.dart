@@ -5,7 +5,11 @@ class CryptoModel {
   final String image;
   final double currentPrice;
   final double marketCap;
+  final double totalVolume; // 24H Volume
+  final double circulatingSupply; // Dolaşımdaki miktar
   final double priceChangePercentage24h;
+  final double ath; // All-Time High
+  final double atl; // All-Time Low
   bool isFavorite;
 
   CryptoModel({
@@ -15,7 +19,11 @@ class CryptoModel {
     required this.image,
     required this.currentPrice,
     required this.marketCap,
+    required this.totalVolume,
+    required this.circulatingSupply,
     required this.priceChangePercentage24h,
+    required this.ath,
+    required this.atl,
     this.isFavorite = false,
   });
 
@@ -27,7 +35,11 @@ class CryptoModel {
       image: json['image'],
       currentPrice: json['current_price'].toDouble(),
       marketCap: json['market_cap'].toDouble(),
+      totalVolume: json['total_volume'].toDouble(),
+      circulatingSupply: json['circulating_supply'].toDouble(),
       priceChangePercentage24h: json['price_change_percentage_24h'].toDouble(),
+      ath: json['ath'].toDouble(),
+      atl: json['atl'].toDouble(),
     );
   }
 
@@ -39,7 +51,11 @@ class CryptoModel {
       'image': image,
       'current_price': currentPrice,
       'market_cap': marketCap,
+      'total_volume': totalVolume,
+      'circulating_supply': circulatingSupply,
       'price_change_percentage_24h': priceChangePercentage24h,
+      'ath': ath,
+      'atl': atl,
       'is_favorite': isFavorite,
     };
   }
