@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/chat_room_model.dart';
 import '../models/chat_message_model.dart';
@@ -16,15 +17,47 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ChatService _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
+  bool _hasJoinedRoom = false; // Kullanıcının odaya katılıp katılmadığını tutar
+
+  @override
+  void initState() {
+    super.initState();
+    _checkIfUserJoinedRoom(); // Kullanıcının odaya katılıp katılmadığını kontrol et
+  }
+
+  // Kullanıcının odaya katılıp katılmadığını kontrol et
+  Future<void> _checkIfUserJoinedRoom() async {
+    final currentUser = _chatService.getCurrentUser();
+    if (currentUser != null) {
+      final roomDoc = await FirebaseFirestore.instance
+          .collection('chatRooms')
+          .doc(widget.chatRoom.id)
+          .get();
+
+      if (roomDoc.exists) {
+        final users = List<String>.from(roomDoc['users'] ?? []);
+        setState(() {
+          _hasJoinedRoom = users.contains(currentUser.uid);
+        });
+      }
+    }
+  }
 
   void _sendMessage() {
-    if (_messageController.text.trim().isNotEmpty) {
+    if (_messageController.text.trim().isNotEmpty && _hasJoinedRoom) {
       _chatService.sendMessage(
         widget.chatRoom.id,
         _messageController.text.trim(),
       );
       _messageController.clear();
     }
+  }
+
+  void _joinRoom() async {
+    await _chatService.joinRoom(widget.chatRoom.id);
+    setState(() {
+      _hasJoinedRoom = true; // Kullanıcı odaya katıldı
+    });
   }
 
   void _leaveRoom() {
@@ -232,58 +265,82 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
 
-          // Message Input Section
-          Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 5,
-                  offset: const Offset(0, -3),
-                ),
-              ],
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _messageController,
-                    decoration: InputDecoration(
-                      hintText: 'Enter your message...',
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide.none,
-                      ),
-                      filled: true,
-                      fillColor: theme.brightness == Brightness.dark
-                          ? Colors.grey[800]
-                          : Colors.grey[200],
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 10,
-                      ),
+          // Kullanıcı odaya katılmadıysa uyarı mesajı ve Join butonu
+          if (!_hasJoinedRoom)
+            Container(
+              padding: const EdgeInsets.all(16),
+              color: theme.brightness == Brightness.dark
+                  ? Colors.grey[850]
+                  : Colors.grey[200],
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'You must join the room to send messages.',
+                      style: theme.textTheme.bodyMedium,
                     ),
-                    maxLines: 4,
-                    minLines: 1,
                   ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _sendMessage,
-                  style: ElevatedButton.styleFrom(
-                    shape: const CircleBorder(),
-                    padding: const EdgeInsets.all(16),
-                    backgroundColor: colorScheme.primary,
+                  ElevatedButton(
+                    onPressed: _joinRoom,
+                    child: Text('Join Room'),
                   ),
-                  child: const Icon(Icons.send, color: Colors.white),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+
+          // Kullanıcı odaya katıldıysa mesaj yazma kutusu
+          if (_hasJoinedRoom)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 5,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Enter your message...',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: theme.brightness == Brightness.dark
+                            ? Colors.grey[800]
+                            : Colors.grey[200],
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 10,
+                        ),
+                      ),
+                      maxLines: 4,
+                      minLines: 1,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _sendMessage,
+                    style: ElevatedButton.styleFrom(
+                      shape: const CircleBorder(),
+                      padding: const EdgeInsets.all(16),
+                      backgroundColor: colorScheme.primary,
+                    ),
+                    child: const Icon(Icons.send, color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

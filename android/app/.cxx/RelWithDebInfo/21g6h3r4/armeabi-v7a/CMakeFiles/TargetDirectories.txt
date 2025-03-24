@@ -1,0 +1,2 @@
+C:/Users/mrahm/Documents/project/bullbearnews/android/app/.cxx/RelWithDebInfo/21g6h3r4/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/mrahm/Documents/project/bullbearnews/android/app/.cxx/RelWithDebInfo/21g6h3r4/armeabi-v7a/CMakeFiles/rebuild_cache.dir

@@ -12,7 +12,20 @@
           "package_name": "com.example.bullbearnews"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "211885957058-15uphr7ph9kqe5f9acmpfbhfd91upufn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.bullbearnews",
+            "certificate_hash": "70fd24c6f0b6e29e81168ff5a160ae0dbaef7866"
+          }
+        },
+        {
+          "client_id": "211885957058-16n0c638q2vnj4pha5oasaipf41dgi80.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC3QoDXsOi3CQTOGi6LaSMautk6NzWki-g"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "211885957058-16n0c638q2vnj4pha5oasaipf41dgi80.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "211885957058-akaa3sa2sg3fn5e8dv03aobh2fe9dee7.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.bullbearnews"
+              }
+            }
+          ]
         }
       }
     }
