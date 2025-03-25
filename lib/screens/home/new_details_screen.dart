@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../models/news_model.dart';
-import '../services/news_service.dart';
+import '../../models/news_model.dart';
+import '../../services/news_service.dart';
 
 class NewsDetailScreen extends StatefulWidget {
   final String newsId;

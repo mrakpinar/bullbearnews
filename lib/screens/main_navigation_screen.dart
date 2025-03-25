@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
-import 'market_screen.dart';
-import 'community_screen.dart';
-import 'profile_screen.dart';
+import 'home/home_screen.dart';
+import 'market/market_screen.dart';
+import 'community/community_screen.dart';
+import 'profile/profile_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});

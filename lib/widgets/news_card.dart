@@ -1,4 +1,4 @@
-import 'package:bullbearnews/screens/new_details_screen.dart';
+import 'package:bullbearnews/screens/home/new_details_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/news_model.dart';

@@ -11,7 +11,6 @@ class CryptoService {
   final Duration _cacheDuration = const Duration(minutes: 5);
 
   Future<List<CryptoModel>> getCryptoData({bool forceRefresh = false}) async {
-    // Eğer önbellekte veri varsa ve önbellek süresi dolmadıysa önbellekten döndür
     if (!forceRefresh &&
         _cachedData != null &&
         _lastFetchTime != null &&

@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import '../models/chat_room_model.dart';
-import '../models/chat_message_model.dart';
-import '../services/chat_service.dart';
+import '../../models/chat_room_model.dart';
+import '../../models/chat_message_model.dart';
+import '../../services/chat_service.dart';
 
 class ChatScreen extends StatefulWidget {
   final ChatRoom chatRoom;

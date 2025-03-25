@@ -1,8 +1,8 @@
 import 'package:bullbearnews/widgets/news_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import '../models/news_model.dart';
-import '../services/news_service.dart';
+import '../../models/news_model.dart';
+import '../../services/news_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

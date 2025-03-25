@@ -1,6 +1,6 @@
 // screens/crypto_detail_screen.dart
 import 'package:flutter/material.dart';
-import '../models/crypto_model.dart';
+import '../../models/crypto_model.dart';
 
 class CryptoDetailScreen extends StatelessWidget {
   final CryptoModel crypto;

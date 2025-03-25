@@ -1,8 +1,8 @@
-import 'package:bullbearnews/screens/crypto_detail_screen.dart';
+import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/crypto_model.dart';
-import '../services/crypto_service.dart';
+import '../../models/crypto_model.dart';
+import '../../services/crypto_service.dart';
 
 class MarketScreen extends StatefulWidget {
   const MarketScreen({super.key});

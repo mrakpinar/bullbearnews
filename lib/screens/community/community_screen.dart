@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../models/chat_room_model.dart';
-import '../screens/chat_screen.dart';
-import '../services/chat_service.dart';
+import '../../models/chat_room_model.dart';
+import 'chat_screen.dart';
+import '../../services/chat_service.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});

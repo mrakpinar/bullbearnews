@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart'; // Provider ekledik
 import 'firebase_options.dart';
-import 'screens/auth_wrapper.dart';
+import 'screens/auth/auth_wrapper.dart';
 import 'providers/theme_provider.dart'; // Tema yöneticisi
 
 void main() async {
