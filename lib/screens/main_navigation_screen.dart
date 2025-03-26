@@ -15,11 +15,12 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
 
-  final List<Widget> _screens = [
-    const HomeScreen(),
-    const MarketScreen(),
-    const CommunityScreen(),
-    const ProfileScreen(),
+  // Screens'i önbelleğe al
+  final List<Widget> _screens = const [
+    HomeScreen(),
+    MarketScreen(),
+    CommunityScreen(),
+    ProfileScreen(),
   ];
 
   @override
@@ -29,65 +30,61 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    // Animate to the selected page when navbar item is tapped
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    if (_selectedIndex == index) return; // Aynı sayfaya tekrar tıklamayı önle
+
+    setState(() => _selectedIndex = index);
+    _pageController.jumpToPage(index); // Animasyon yerine direkt geçiş
   }
 
   void _onPageChanged(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return Scaffold(
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
-        physics: const PageScrollPhysics(),
-        children: _screens, // Enables swiping between pages
+        physics:
+            const NeverScrollableScrollPhysics(), // Swipe'ı devre dışı bırak
+        children: _screens,
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: _onItemTapped,
-        backgroundColor: isDarkMode ? Colors.black : Colors.white,
-        elevation: 0,
-        labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_sharp),
-            selectedIcon: Icon(
-              Icons.home,
-            ),
-            label: 'News',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.show_chart_outlined),
-            selectedIcon: Icon(Icons.show_chart),
-            label: 'Market',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group),
-            label: 'Community',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
-      ),
+      bottomNavigationBar: _buildNavigationBar(context),
+    );
+  }
+
+  Widget _buildNavigationBar(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return NavigationBar(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: _onItemTapped,
+      backgroundColor: isDarkMode ? Colors.black : Colors.white,
+      elevation: 0,
+      labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'News',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.show_chart_outlined),
+          selectedIcon: Icon(Icons.show_chart),
+          label: 'Market',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.group_outlined),
+          selectedIcon: Icon(Icons.group),
+          label: 'Community',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 }

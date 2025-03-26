@@ -1,4 +1,4 @@
-// screens/crypto_detail_screen.dart
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../models/crypto_model.dart';
 
@@ -10,6 +10,7 @@ class CryptoDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPositive = crypto.priceChangePercentage24h >= 0;
+    Theme.of(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -20,84 +21,95 @@ class CryptoDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Coin resmi ve sembolü
-            Center(
-              child: Column(
-                children: [
-                  Image.network(
-                    crypto.image,
-                    width: 100,
-                    height: 100,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.currency_bitcoin, size: 100);
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    crypto.symbol.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
+            // Coin image and symbol
+            _buildCoinHeader(),
             const SizedBox(height: 24),
 
-            // Fiyat bilgisi
-            Text(
-              '\$${_formatPrice(crypto.currentPrice)}',
-              style: const TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Değişim yüzdesi
-            Row(
-              children: [
-                Icon(
-                  isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-                  color: isPositive ? Colors.green : Colors.red,
-                  size: 20,
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
-                  style: TextStyle(
-                    color: isPositive ? Colors.green : Colors.red,
-                    fontSize: 18,
-                  ),
-                ),
-              ],
-            ),
-
+            // Price information
+            _buildPriceSection(isPositive),
             const SizedBox(height: 24),
 
-            // Market Cap
-            _buildDetailRow(
-                'Market Cap', '\$${_formatNumber(crypto.marketCap)}'),
-
-            // 24H Volume
-            _buildDetailRow(
-                '24H Volume', '\$${_formatNumber(crypto.totalVolume)}'),
-
-            // Circulating Supply
-            _buildDetailRow('Circulating Supply',
-                '${_formatNumber(crypto.circulatingSupply)} ${crypto.symbol.toUpperCase()}'),
-
-            // All-Time High
-            _buildDetailRow('All-Time High', '\$${_formatPrice(crypto.ath)}'),
-
-            // All-Time Low
-            _buildDetailRow('All-Time Low', '\$${_formatPrice(crypto.atl)}'),
+            // Market details
+            _buildMarketDetails(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildCoinHeader() {
+    return Center(
+      child: Column(
+        children: [
+          CachedNetworkImage(
+            imageUrl: crypto.image,
+            width: 100,
+            height: 100,
+            placeholder: (context, url) => const CircularProgressIndicator(),
+            errorWidget: (context, url, error) => const Icon(
+              Icons.currency_bitcoin,
+              size: 100,
+              color: Colors.grey,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            crypto.symbol.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPriceSection(bool isPositive) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '\$${_formatPrice(crypto.currentPrice)}',
+          style: const TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Icon(
+              isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+              color: isPositive ? Colors.green : Colors.red,
+              size: 20,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+              style: TextStyle(
+                color: isPositive ? Colors.green : Colors.red,
+                fontSize: 18,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMarketDetails() {
+    return Column(
+      children: [
+        _buildDetailRow('Market Cap', '\$${_formatNumber(crypto.marketCap)}'),
+        _buildDetailRow('24H Volume', '\$${_formatNumber(crypto.totalVolume)}'),
+        _buildDetailRow(
+          'Circulating Supply',
+          '${_formatNumber(crypto.circulatingSupply)} ${crypto.symbol.toUpperCase()}',
+        ),
+        _buildDetailRow('All-Time High', '\$${_formatPrice(crypto.ath)}'),
+        _buildDetailRow('All-Time Low', '\$${_formatPrice(crypto.atl)}'),
+      ],
     );
   }
 
@@ -127,32 +139,24 @@ class CryptoDetailScreen extends StatelessWidget {
   }
 
   String _formatNumber(double number) {
-    if (number >= 1000000000) {
-      return '${(number / 1000000000).toStringAsFixed(2)}B';
-    } else if (number >= 1000000) {
-      return '${(number / 1000000).toStringAsFixed(2)}M';
-    } else if (number >= 1000) {
-      return '${(number / 1000).toStringAsFixed(2)}K';
-    } else {
-      return number.toString();
-    }
+    if (number >= 1e9) return '${(number / 1e9).toStringAsFixed(2)}B';
+    if (number >= 1e6) return '${(number / 1e6).toStringAsFixed(2)}M';
+    if (number >= 1e3) return '${(number / 1e3).toStringAsFixed(2)}K';
+    return number.toStringAsFixed(2);
   }
 
   String _formatPrice(double price) {
     if (price < 1) {
-      // Küçük sayılar için 6 ondalık basamak
       return price
           .toStringAsFixed(6)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
     } else if (price < 1000) {
-      // 1 ile 1000 arasındaki sayılar için 2 ondalık basamak
       return price
           .toStringAsFixed(2)
           .replaceAll(RegExp(r'0+$'), '')
           .replaceAll(RegExp(r'\.$'), '');
     } else {
-      // 1000'den büyük sayılar için tam sayı formatı
       return price.toStringAsFixed(0);
     }
   }
