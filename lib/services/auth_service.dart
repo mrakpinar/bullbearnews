@@ -92,4 +92,19 @@ class AuthService {
       rethrow;
     }
   }
+
+  Future<void> updateProfileImage(String imageUrl) async {
+    try {
+      User? user = _auth.currentUser;
+      if (user != null) {
+        // Update Firestore document with profile image
+        await _firestore.collection('users').doc(user.uid).update({
+          'profileImageUrl': imageUrl,
+        });
+      }
+    } catch (e) {
+      print('Profil resmi güncelleme hatası: $e');
+      rethrow;
+    }
+  }
 }

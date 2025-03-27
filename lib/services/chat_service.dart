@@ -45,9 +45,11 @@ class ChatService {
 
     final user = _auth.currentUser!;
 
-    // Kullanıcının nickname'ini Firestore'dan çekme
+    // Kullanıcının nickname ve profil fotoğrafını Firestore'dan çekme
     final userDoc = await _firestore.collection('users').doc(user.uid).get();
     final nickname = userDoc.data()?['nickname'] ?? 'Anonim Kullanıcı';
+    final profileImageUrl =
+        userDoc.data()?['profileImageUrl']; // Profil fotoğrafı URL'si
 
     await _firestore
         .collection('chatRooms')
@@ -57,7 +59,7 @@ class ChatService {
       'roomId': roomId,
       'userId': user.uid,
       'username': nickname,
-      'userProfileImage': user.photoURL,
+      'userProfileImage': profileImageUrl, // Profil fotoğrafı URL'si ekleniyor
       'content': content,
       'timestamp': FieldValue.serverTimestamp(),
       'likes': 0,

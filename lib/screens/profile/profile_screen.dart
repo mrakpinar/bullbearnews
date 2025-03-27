@@ -1,10 +1,13 @@
 import 'package:bullbearnews/screens/profile/add_to_wallet_screen.dart';
 import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
+import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
 import 'package:bullbearnews/widgets/user_profile_header.dart';
 import 'package:bullbearnews/widgets/wallet_summary_card.dart';
+import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -22,6 +25,7 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  final AuthService _authService = AuthService();
   final CryptoService _cryptoService = CryptoService();
   List<CryptoModel> _favoriteCryptos = [];
   List<WalletItem> _walletItems = [];
@@ -32,11 +36,84 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double _totalInvestment = 0;
   double _totalProfitLoss = 0;
   double _totalProfitLossPercentage = 0;
+  String? _profileImageUrl;
 
   @override
   void initState() {
     super.initState();
+    _loadProfileImage();
     _loadData();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _profileImageUrl = prefs.getString('profileImageUrl');
+    });
+  }
+
+  Future<void> _uploadProfileImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      try {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return const Center(
+              child: CircularProgressIndicator(),
+            );
+          },
+        );
+
+        // Configure Cloudinary
+        final cloudinary = CloudinaryPublic(
+            'dh7lpyg7t', // Your Cloudinary cloud name
+            'upload_image', // Your upload preset
+            cache: false);
+
+        // Upload image to Cloudinary
+        final response = await cloudinary.uploadFile(
+          CloudinaryFile.fromFile(
+            pickedFile.path,
+            folder: 'profile_images', // Optional folder in Cloudinary
+            publicId: 'profile_${FirebaseAuth.instance.currentUser!.uid}',
+          ),
+        );
+
+        // Save image URL to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profileImageUrl', response.secureUrl);
+
+        // Update user's profile in Firebase
+        await _authService.updateProfileImage(response.secureUrl);
+
+        // Update local state
+        setState(() {
+          _profileImageUrl = response.secureUrl;
+        });
+
+        // Close loading dialog
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile image updated successfully')),
+        );
+      } catch (e) {
+        // Close loading dialog
+        Navigator.of(context).pop();
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _loadData() async {
@@ -236,7 +313,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.all(16.0),
             child: Column(
               children: [
-                UserProfileHeader(user: user),
+                UserProfileHeader(
+                  user: user,
+                  profileImageUrl: _profileImageUrl,
+                  onImageUpload: _uploadProfileImage,
+                ),
                 const SizedBox(height: 32),
                 WalletSummaryCard(
                   totalPortfolioValue: _totalPortfolioValue,
