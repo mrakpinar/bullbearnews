@@ -2,6 +2,7 @@ import 'package:bullbearnews/screens/home/new_details_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../models/news_model.dart';
+import '../services/local_storage_service.dart';
 
 Route _createRoute(Widget page) {
   return PageRouteBuilder(
@@ -16,11 +17,16 @@ Route _createRoute(Widget page) {
   );
 }
 
-class NewsCard extends StatelessWidget {
+class NewsCard extends StatefulWidget {
   final NewsModel news;
 
   const NewsCard({super.key, required this.news});
 
+  @override
+  State<NewsCard> createState() => _NewsCardState();
+}
+
+class _NewsCardState extends State<NewsCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -39,7 +45,7 @@ class NewsCard extends StatelessWidget {
         onTap: () {
           Navigator.push(
             context,
-            _createRoute(NewsDetailScreen(newsId: news.id)),
+            _createRoute(NewsDetailScreen(newsId: widget.news.id)),
           );
         },
         borderRadius: BorderRadius.circular(16),
@@ -55,7 +61,7 @@ class NewsCard extends StatelessWidget {
               ClipRRect(
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 child: CachedNetworkImage(
-                  imageUrl: news.imageUrl,
+                  imageUrl: widget.news.imageUrl,
                   height: 200,
                   width: double.infinity,
                   fit: BoxFit.cover,
@@ -93,7 +99,7 @@ class NewsCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            news.category,
+                            widget.news.category,
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 12,
@@ -102,7 +108,7 @@ class NewsCard extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          _formatDate(news.publishDate),
+                          _formatDate(widget.news.publishDate),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
@@ -115,7 +121,7 @@ class NewsCard extends StatelessWidget {
 
                     // Başlık
                     Text(
-                      news.title,
+                      widget.news.title,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
@@ -126,7 +132,7 @@ class NewsCard extends StatelessWidget {
 
                     // İçerik
                     Text(
-                      news.content,
+                      widget.news.content,
                       style: TextStyle(
                         color: Colors.grey[700],
                         fontSize: 14,
@@ -150,40 +156,76 @@ class NewsCard extends StatelessWidget {
                               color: Colors.grey[600],
                             ),
                             SizedBox(width: 4),
-                            Text(
-                              news.author,
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                            ),
+                            Text(widget.news.author),
                           ],
                         ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              _createRoute(NewsDetailScreen(newsId: news.id)),
-                            );
-                          },
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 6),
-                            minimumSize: Size(0, 0),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                'Read more',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                        Row(
+                          children: [
+                            IconButton(
+                              icon: FutureBuilder<bool>(
+                                future: LocalStorageService.isNewsSaved(
+                                    widget.news.id),
+                                builder: (context, snapshot) {
+                                  final isSaved = snapshot.data ?? false;
+                                  return Icon(
+                                    isSaved
+                                        ? Icons.bookmark
+                                        : Icons.bookmark_border,
+                                    color:
+                                        Theme.of(context).colorScheme.primary,
+                                  );
+                                },
                               ),
-                              SizedBox(width: 4),
-                              Icon(Icons.arrow_forward, size: 14),
-                            ],
-                          ),
+                              onPressed: () async {
+                                try {
+                                  final isSaved =
+                                      await LocalStorageService.isNewsSaved(
+                                          widget.news.id);
+                                  if (isSaved) {
+                                    await LocalStorageService.removeNews(
+                                        widget.news.id);
+                                  } else {
+                                    await LocalStorageService.saveNews(
+                                        widget.news);
+                                  }
+                                  if (mounted) setState(() {});
+                                } catch (e) {
+                                  print('Error toggling bookmark: $e');
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                        content: Text('Error saving news: $e')),
+                                  );
+                                }
+                              },
+                            )
+                            // TextButton(
+                            //   onPressed: () {
+                            //     Navigator.push(
+                            //       context,
+                            //       _createRoute(
+                            //           NewsDetailScreen(newsId: widget.news.id)),
+                            //     );
+                            //   },
+                            //   style: TextButton.styleFrom(
+                            //     padding: EdgeInsets.symmetric(
+                            //         horizontal: 12, vertical: 6),
+                            //     minimumSize: Size(0, 0),
+                            //   ),
+                            //   child: Row(
+                            //     children: [
+                            //       Text(
+                            //         'Read more',
+                            //         style: TextStyle(
+                            //           fontSize: 12,
+                            //           fontWeight: FontWeight.bold,
+                            //         ),
+                            //       ),
+                            //       SizedBox(width: 4),
+                            //       Icon(Icons.arrow_forward, size: 14),
+                            //     ],
+                            //   ),
+                            // ),
+                          ],
                         ),
                       ],
                     ),

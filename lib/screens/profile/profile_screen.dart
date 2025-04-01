@@ -2,6 +2,7 @@ import 'package:bullbearnews/screens/profile/add_to_wallet_screen.dart';
 import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
 import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
+import 'package:bullbearnews/widgets/saved_news_list.dart';
 import 'package:bullbearnews/widgets/user_profile_header.dart';
 import 'package:bullbearnews/widgets/wallet_summary_card.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
@@ -31,6 +32,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   List<WalletItem> _walletItems = [];
   bool _isLoading = true;
   bool _isWalletLoading = true;
+  bool _isNewsLoading = false;
   String _errorMessage = '';
   double _totalPortfolioValue = 0;
   double _totalInvestment = 0;
@@ -284,6 +286,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _loadSaveNews() async {
+    if (mounted) {
+      setState(() => _isNewsLoading = true);
+    }
+    await Future.delayed(
+      const Duration(microseconds: 500),
+    );
+    if (mounted) {
+      setState(() => _isNewsLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -333,6 +347,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   favoriteCryptos: _favoriteCryptos,
                   onRefresh: _loadFavoriteCryptos,
                 ),
+                const SizedBox(height: 32),
+                SavedNewsList(
+                    isLoading: _isNewsLoading, onRefresh: _loadSaveNews)
               ],
             ),
           ),

@@ -1,8 +1,15 @@
 allprojects {
+   buildscript {
     repositories {
         google()
         mavenCentral()
     }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:7.3.1'  // Android Gradle Plugin sürümü
+        classpath 'com.google.gms:google-services:4.3.15'  // En güncel Google Services sürümü
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.0"  // Kotlin sürümü
+    }
+}
 }
 
 rootProject.buildDir = "../build"

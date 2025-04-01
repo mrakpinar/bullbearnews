@@ -1,6 +1,8 @@
+import 'package:bullbearnews/models/news_model.dart';
+import 'package:bullbearnews/services/local_storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/services.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/auth/auth_wrapper.dart';
@@ -9,14 +11,22 @@ import 'providers/theme_provider.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase ve ekran yönünü paralel başlat
-  await Future.wait([
-    Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform),
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]),
-  ]);
+  try {
+    await Hive.initFlutter();
+    Hive.registerAdapter(NewsModelAdapter());
+    await LocalStorageService.init();
+  } catch (e) {
+    print('Hive initialization error: $e');
+    // Hive başlatılamazsa uygulama çalışmaya devam etsin
+    try {
+      await Hive.deleteBoxFromDisk('savedNews');
+      await LocalStorageService.init();
+    } catch (e) {
+      print('Failed to recover from Hive error: $e');
+    }
+  }
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
     ChangeNotifierProvider(
