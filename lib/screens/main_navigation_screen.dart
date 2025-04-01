@@ -47,7 +47,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
         controller: _pageController,
         onPageChanged: _onPageChanged,
         physics:
-            const NeverScrollableScrollPhysics(), // Swipe'ı devre dışı bırak
+            const AlwaysScrollableScrollPhysics(), // Swipe'ı devre dışı bırak
         children: _screens,
       ),
       bottomNavigationBar: _buildNavigationBar(context),

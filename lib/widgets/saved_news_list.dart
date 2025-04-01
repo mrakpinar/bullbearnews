@@ -3,7 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../models/news_model.dart';
 import '../../screens/home/new_details_screen.dart';
 
-class SavedNewsList extends StatefulWidget {
+class SavedNewsList extends StatelessWidget {
   final bool isLoading;
   final VoidCallback onRefresh;
 
@@ -13,11 +13,6 @@ class SavedNewsList extends StatefulWidget {
     required this.onRefresh,
   });
 
-  @override
-  State<SavedNewsList> createState() => _SavedNewsListState();
-}
-
-class _SavedNewsListState extends State<SavedNewsList> {
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -35,7 +30,7 @@ class _SavedNewsListState extends State<SavedNewsList> {
         ValueListenableBuilder<Box<NewsModel>>(
           valueListenable: Hive.box<NewsModel>('savedNews').listenable(),
           builder: (context, box, _) {
-            if (widget.isLoading) {
+            if (isLoading) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -155,16 +150,7 @@ class _SavedNewsListState extends State<SavedNewsList> {
                 onPressed: () async {
                   try {
                     await Hive.box<NewsModel>('savedNews').delete(news.id);
-
-                    // Hem context'in mounted olduğunu hem de widget'ın hala
-                    // tree'de olduğunu kontrol ediyoruz
-                    final scaffoldMessenger =
-                        ScaffoldMessenger.maybeOf(context);
-                    if (scaffoldMessenger != null && mounted) {
-                      scaffoldMessenger.showSnackBar(
-                        const SnackBar(content: Text('Removed from saved')),
-                      );
-                    }
+                    onRefresh();
                   } catch (e) {
                     debugPrint('Error removing news: $e');
                   }

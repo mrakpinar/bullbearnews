@@ -4,19 +4,6 @@ import 'package:flutter/material.dart';
 import '../models/news_model.dart';
 import '../services/local_storage_service.dart';
 
-Route _createRoute(Widget page) {
-  return PageRouteBuilder(
-    pageBuilder: (context, animation, secondaryAnimation) => page,
-    transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      return FadeTransition(
-        opacity: animation,
-        child: child,
-      );
-    },
-    transitionDuration: Duration(milliseconds: 500),
-  );
-}
-
 class NewsCard extends StatefulWidget {
   final NewsModel news;
 
@@ -42,12 +29,7 @@ class _NewsCardState extends State<NewsCard> {
         ],
       ),
       child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            _createRoute(NewsDetailScreen(newsId: widget.news.id)),
-          );
-        },
+        onTap: () => _navigateToDetail(),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
@@ -161,43 +143,8 @@ class _NewsCardState extends State<NewsCard> {
                         ),
                         Row(
                           children: [
-                            IconButton(
-                              icon: FutureBuilder<bool>(
-                                future: LocalStorageService.isNewsSaved(
-                                    widget.news.id),
-                                builder: (context, snapshot) {
-                                  final isSaved = snapshot.data ?? false;
-                                  return Icon(
-                                    isSaved
-                                        ? Icons.bookmark
-                                        : Icons.bookmark_border,
-                                    color:
-                                        Theme.of(context).colorScheme.primary,
-                                  );
-                                },
-                              ),
-                              onPressed: () async {
-                                try {
-                                  final isSaved =
-                                      await LocalStorageService.isNewsSaved(
-                                          widget.news.id);
-                                  if (isSaved) {
-                                    await LocalStorageService.removeNews(
-                                        widget.news.id);
-                                  } else {
-                                    await LocalStorageService.saveNews(
-                                        widget.news);
-                                  }
-                                  if (mounted) setState(() {});
-                                } catch (e) {
-                                  print('Error toggling bookmark: $e');
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                        content: Text('Error saving news: $e')),
-                                  );
-                                }
-                              },
-                            )
+                            _buildSaveButton(),
+
                             // TextButton(
                             //   onPressed: () {
                             //     Navigator.push(
@@ -235,6 +182,50 @@ class _NewsCardState extends State<NewsCard> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSaveButton() {
+    return FutureBuilder<bool>(
+      future: LocalStorageService.isNewsSaved(widget.news.id),
+      builder: (context, snapshot) {
+        final isSaved = snapshot.data ?? false;
+        return IconButton(
+          icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
+          onPressed: _toggleSave,
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleSave() async {
+    try {
+      final isSaved = await LocalStorageService.isNewsSaved(widget.news.id);
+      if (isSaved) {
+        await LocalStorageService.removeNews(widget.news.id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Removed from saved')),
+        );
+      } else {
+        await LocalStorageService.saveNews(widget.news);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Added to saved')),
+        );
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}')),
+      );
+    }
+  }
+
+  void _navigateToDetail() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NewsDetailScreen(newsId: widget.news.id),
       ),
     );
   }

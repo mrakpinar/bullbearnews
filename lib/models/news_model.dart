@@ -7,22 +7,16 @@ part 'news_model.g.dart';
 class NewsModel {
   @HiveField(0)
   final String id;
-
   @HiveField(1)
   final String title;
-
   @HiveField(2)
   final String content;
-
   @HiveField(3)
   final String imageUrl;
-
   @HiveField(4)
   final String category;
-
   @HiveField(5)
   final DateTime publishDate;
-
   @HiveField(6)
   final String author;
 
@@ -38,15 +32,13 @@ class NewsModel {
 
   factory NewsModel.fromJson(Map<String, dynamic> json) {
     return NewsModel(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      content: json['content'] as String? ?? '',
-      imageUrl: json['imageUrl'] as String? ?? '',
-      category: json['category'] as String? ?? '',
-      publishDate: json['publishDate'] != null
-          ? (json['publishDate'] as Timestamp).toDate()
-          : DateTime.now(),
-      author: json['author'] as String? ?? '',
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      content: json['content'] ?? '',
+      imageUrl: json['imageUrl'] ?? '',
+      category: json['category'] ?? '',
+      publishDate: (json['publishDate'] as Timestamp).toDate(),
+      author: json['author'] ?? '',
     );
   }
 
@@ -57,7 +49,7 @@ class NewsModel {
       'content': content,
       'imageUrl': imageUrl,
       'category': category,
-      'publishDate': publishDate.toIso8601String(),
+      'publishDate': Timestamp.fromDate(publishDate),
       'author': author,
     };
   }

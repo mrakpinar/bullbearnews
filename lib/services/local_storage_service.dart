@@ -6,12 +6,12 @@ class LocalStorageService {
 
   static Future<void> init() async {
     try {
-      // Önceki box'ı sil (eğer bozuksa)
-      await Hive.deleteBoxFromDisk('savedNews');
       _box = await Hive.openBox<NewsModel>('savedNews');
     } catch (e) {
-      print('Error initializing Hive: $e');
-      rethrow;
+      print('Error opening Hive box: $e');
+      // Box bozuksa silip yeniden aç
+      await Hive.deleteBoxFromDisk('savedNews');
+      _box = await Hive.openBox<NewsModel>('savedNews');
     }
   }
 
@@ -20,7 +20,7 @@ class LocalStorageService {
       await _box.put(news.id, news);
     } catch (e) {
       print('Error saving news: $e');
-      rethrow;
+      throw Exception('Failed to save news');
     }
   }
 
@@ -29,13 +29,13 @@ class LocalStorageService {
       await _box.delete(newsId);
     } catch (e) {
       print('Error removing news: $e');
-      rethrow;
+      throw Exception('Failed to remove news');
     }
   }
 
-  static List<NewsModel> getSavedNews() {
+  static Future<List<NewsModel>> getSavedNews() async {
     try {
-      return _box.values.where((news) => news.id.isNotEmpty).toList();
+      return _box.values.toList();
     } catch (e) {
       print('Error getting saved news: $e');
       return [];
@@ -44,17 +44,18 @@ class LocalStorageService {
 
   static Future<bool> isNewsSaved(String newsId) async {
     try {
-      return _box.containsKey(newsId) &&
-          _box.get(newsId)?.id.isNotEmpty == true;
+      return _box.containsKey(newsId);
     } catch (e) {
       print('Error checking saved news: $e');
       return false;
     }
   }
 
-  static Future<void> closeBox() async {
-    if (_box.isOpen) {
-      await _box.close();
+  static Future<void> clearAll() async {
+    try {
+      await _box.clear();
+    } catch (e) {
+      print('Error clearing box: $e');
     }
   }
 }
