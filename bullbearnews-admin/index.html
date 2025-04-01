@@ -166,6 +166,105 @@
         </div>
     </div>
 
+    <!-- Anketler -->
+    <div class="card mt-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3>Anketler</h3>
+            <button id="refresh-polls" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-clockwise"></i> Yenile
+            </button>
+        </div>
+        <div class="card-body">
+            <!-- Anket Ekleme Formu -->
+            <form id="poll-form" class="mb-4">
+                <div class="mb-3">
+                    <label for="poll-question" class="form-label">Anket Sorusu</label>
+                    <input type="text" class="form-control" id="poll-question" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Seçenekler</label>
+                    <div id="poll-options-container">
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control poll-option" placeholder="Seçenek 1" required>
+                            <button type="button" class="btn btn-outline-danger remove-option">×</button>
+                        </div>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control poll-option" placeholder="Seçenek 2" required>
+                            <button type="button" class="btn btn-outline-danger remove-option">×</button>
+                        </div>
+                    </div>
+                    <button type="button" id="add-option" class="btn btn-sm btn-outline-secondary mt-2">+ Seçenek Ekle</button>
+                </div>
+                <button type="submit" class="btn btn-success" id="add-poll-button">Anket Oluştur</button>
+            </form>
+
+            <!-- Anket Listesi -->
+            <div class="table-responsive">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Soru</th>
+                            <th>Seçenekler</th>
+                            <th>Durum</th>
+                            <th>İşlemler</th>
+                        </tr>
+                    </thead>
+                    <tbody id="polls-list">
+                        <!-- JavaScript ile doldurulacak -->
+                    </tbody>
+                </table>
+            </div>
+            <div id="loading-polls" class="text-center py-3">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Yükleniyor...</span>
+                </div>
+            </div>
+            <div id="no-polls" class="alert alert-info d-none">
+                Henüz anket bulunmuyor.
+            </div>
+        </div>
+    </div>
+
+    <!-- Anket Silme Modal -->
+    <div class="modal fade" id="deletePollModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Anketi Sil</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+                </div>
+                <div class="modal-body">
+                    Bu anketi silmek istediğinize emin misiniz?
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="button" class="btn btn-danger" id="confirm-delete-poll">Sil</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     <!-- Haber Silme Modal -->
     <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">

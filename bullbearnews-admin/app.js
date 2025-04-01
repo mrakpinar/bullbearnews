@@ -60,6 +60,19 @@ const confirmDeleteRoomButton = document.getElementById('confirm-delete-room');
 const clearMessagesModal = new bootstrap.Modal(document.getElementById('clearMessagesModal'));
 const confirmClearMessagesButton = document.getElementById('confirm-clear-messages');
 
+// DOM elemanları - Anketler
+const pollForm = document.getElementById('poll-form');
+const pollQuestionInput = document.getElementById('poll-question');
+const pollOptionsContainer = document.getElementById('poll-options-container');
+const addOptionButton = document.getElementById('add-option');
+const addPollButton = document.getElementById('add-poll-button');
+const refreshPollsButton = document.getElementById('refresh-polls');
+const pollsList = document.getElementById('polls-list');
+const loadingPolls = document.getElementById('loading-polls');
+const noPolls = document.getElementById('no-polls');
+const deletePollModal = new bootstrap.Modal(document.getElementById('deletePollModal'));
+const confirmDeletePollButton = document.getElementById('confirm-delete-poll');
+
 // Auth durum değişikliğini izle
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -565,5 +578,209 @@ auth.onAuthStateChanged(user => {
         userInfo.classList.add('d-none');
         authRequired.classList.remove('d-none');
         adminContent.classList.add('d-none');
+    }
+});
+
+// Seçenek ekleme butonu
+addOptionButton.addEventListener('click', () => {
+    const optionCount = pollOptionsContainer.querySelectorAll('.poll-option').length + 1;
+    const optionDiv = document.createElement('div');
+    optionDiv.className = 'input-group mb-2';
+    optionDiv.innerHTML = `
+        <input type="text" class="form-control poll-option" placeholder="Seçenek ${optionCount}" required>
+        <button type="button" class="btn btn-outline-danger remove-option">×</button>
+    `;
+    pollOptionsContainer.appendChild(optionDiv);
+});
+
+// Seçenek silme
+pollOptionsContainer.addEventListener('click', (e) => {
+    if (e.target.classList.contains('remove-option')) {
+        if (pollOptionsContainer.querySelectorAll('.poll-option').length > 2) {
+            e.target.closest('.input-group').remove();
+        } else {
+            alert('En az iki seçenek olmalıdır.');
+        }
+    }
+});
+
+// Anket formunu gönder
+pollForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!auth.currentUser) {
+        alert('Anket oluşturmak için giriş yapmalısınız.');
+        return;
+    }
+    
+    const question = pollQuestionInput.value.trim();
+    const options = Array.from(pollOptionsContainer.querySelectorAll('.poll-option'))
+        .map(input => ({
+            text: input.value.trim(),
+            votes: 0
+        }));
+    
+    if (!question || options.some(opt => !opt.text)) {
+        alert('Lütfen tüm alanları doldurun.');
+        return;
+    }
+    
+    if (options.length < 2) {
+        alert('En az iki seçenek eklemelisiniz.');
+        return;
+    }
+    
+    try {
+        addPollButton.disabled = true;
+        
+        await db.collection('polls').add({
+            question,
+            options,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            isActive: true,
+            createdBy: auth.currentUser.uid,
+            votedUserIds: [] // Boş array ile başlatın
+        });
+        
+        alert('Anket başarıyla oluşturuldu.');
+        pollForm.reset();
+        
+        // Seçenekleri varsayılana resetle (2 seçenek)
+        pollOptionsContainer.innerHTML = `
+            <div class="input-group mb-2">
+                <input type="text" class="form-control poll-option" placeholder="Seçenek 1" required>
+                <button type="button" class="btn btn-outline-danger remove-option">×</button>
+            </div>
+            <div class="input-group mb-2">
+                <input type="text" class="form-control poll-option" placeholder="Seçenek 2" required>
+                <button type="button" class="btn btn-outline-danger remove-option">×</button>
+            </div>
+        `;
+        
+        loadPolls();
+    } catch (error) {
+        console.error('Anket oluşturma hatası:', error);
+        alert('Anket oluşturulurken bir hata oluştu: ' + error.message);
+    } finally {
+        addPollButton.disabled = false;
+    }
+});
+
+// Anketleri yükle
+async function loadPolls() {
+    if (!auth.currentUser) return;
+    
+    loadingPolls.classList.remove('d-none');
+    noPolls.classList.add('d-none');
+    pollsList.innerHTML = '';
+    
+    try {
+        const snapshot = await db.collection('polls')
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            noPolls.classList.remove('d-none');
+        } else {
+            snapshot.forEach(doc => {
+                const poll = doc.data();
+                poll.id = doc.id;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                  <td>${poll.question}</td>
+                  <td>
+                    <ul class="mb-0">
+                      ${poll.options.map(opt => `
+                        <li>${opt.text} (${opt.votes} oy - ${poll.votedUserIds?.length || 0} katılımcı)</li>
+                      `).join('')}
+                    </ul>
+                  </td>
+                  <td>
+                    <span class="badge ${poll.isActive ? 'bg-success' : 'bg-danger'}">
+                      ${poll.isActive ? 'Aktif' : 'Pasif'}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="btn-group btn-group-sm">
+                      <button class="btn btn-sm ${poll.isActive ? 'btn-warning' : 'btn-success'} toggle-poll-status" 
+                              data-id="${poll.id}" data-status="${poll.isActive}">
+                        ${poll.isActive ? 'Pasif Yap' : 'Aktif Yap'}
+                      </button>
+                      <button class="btn btn-sm btn-danger delete-poll" 
+                              data-id="${poll.id}">
+                        Sil
+                      </button>
+                    </div>
+                  </td>
+                `;
+                
+                pollsList.appendChild(row);
+              });
+            // Silme butonlarına event listener ekle
+            document.querySelectorAll('.delete-poll').forEach(button => {
+                button.addEventListener('click', event => {
+                    const pollId = event.target.getAttribute('data-id');
+                    confirmDeletePollButton.setAttribute('data-id', pollId);
+                    deletePollModal.show();
+                });
+            });
+            
+            // Durum değiştirme butonlarına event listener ekle
+            document.querySelectorAll('.toggle-poll-status').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const pollId = event.target.getAttribute('data-id');
+                    const currentStatus = event.target.getAttribute('data-status') === 'true';
+                    
+                    try {
+                        await db.collection('polls').doc(pollId).update({
+                            isActive: !currentStatus
+                        });
+                        
+                        alert(`Anket durumu başarıyla ${!currentStatus ? 'aktif' : 'pasif'} olarak güncellendi.`);
+                        loadPolls();
+                    } catch (error) {
+                        console.error('Anket durumu güncelleme hatası:', error);
+                        alert('Anket durumu güncellenirken bir hata oluştu: ' + error.message);
+                    }
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Anket yükleme hatası:', error);
+        alert('Anketler yüklenirken bir hata oluştu: ' + error.message);
+    } finally {
+        loadingPolls.classList.add('d-none');
+    }
+}
+
+// Anket silme işlemi
+confirmDeletePollButton.addEventListener('click', async () => {
+    const pollId = confirmDeletePollButton.getAttribute('data-id');
+    
+    if (!pollId) {
+        deletePollModal.hide();
+        return;
+    }
+    
+    try {
+        await db.collection('polls').doc(pollId).delete();
+        alert('Anket başarıyla silindi.');
+        loadPolls();
+    } catch (error) {
+        console.error('Anket silme hatası:', error);
+        alert('Anket silinirken bir hata oluştu: ' + error.message);
+    } finally {
+        deletePollModal.hide();
+    }
+});
+
+// Yenile butonuna tıklama
+refreshPollsButton.addEventListener('click', loadPolls);
+
+// Auth durum değişikliğinde anketleri de yükle
+auth.onAuthStateChanged(user => {
+    if (user) {
+        loadPolls();
     }
 });

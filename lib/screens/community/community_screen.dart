@@ -1,3 +1,6 @@
+import 'package:bullbearnews/models/poll_model.dart';
+import 'package:bullbearnews/services/poll_serivice.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
 import 'chat_screen.dart';
@@ -10,279 +13,410 @@ class CommunityScreen extends StatefulWidget {
   _CommunityScreenState createState() => _CommunityScreenState();
 }
 
-class _CommunityScreenState extends State<CommunityScreen> {
-  final ChatService _chatService = ChatService();
-  bool _showInactiveRooms = false; // Toggle to show/hide inactive rooms
+class _CommunityScreenState extends State<CommunityScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    // renk tonu
-    final customPurple = const Color(0xFFBB86FC);
-    final inactiveColor = Colors.grey; // Color for inactive rooms
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Community'),
         centerTitle: true,
-        elevation: 0,
-        actions: [
-          // Optional: Add a toggle button to show/hide inactive rooms
-          IconButton(
-            icon: Icon(
-                _showInactiveRooms ? Icons.visibility_off : Icons.visibility),
-            tooltip:
-                _showInactiveRooms ? 'Hide inactive rooms' : 'Show all rooms',
-            onPressed: () {
-              setState(() {
-                _showInactiveRooms = !_showInactiveRooms;
-              });
-            },
-          ),
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.purple,
+          labelColor: Colors.purple,
+          unselectedLabelColor: Colors.grey,
+          tabs: const [
+            Tab(icon: Icon(Icons.forum_outlined), text: 'Chat Rooms'),
+            Tab(icon: Icon(Icons.poll_outlined), text: 'Polls'),
+          ],
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: const [
+          ChatRoomsTab(),
+          PollsTab(),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+    );
+  }
+}
+
+class ChatRoomsTab extends StatelessWidget {
+  const ChatRoomsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final chatService = ChatService();
+    Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: StreamBuilder<List<ChatRoom>>(
+        stream: chatService.getChatRooms(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(child: Text('No chat rooms available'));
+          }
+
+          final rooms = snapshot.data!;
+
+          return GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              childAspectRatio: 0.85,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+            ),
+            itemCount: rooms.length,
+            itemBuilder: (context, index) {
+              final room = rooms[index];
+              return _buildRoomCard(context, room);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRoomCard(BuildContext context, ChatRoom room) {
+    final theme = Theme.of(context);
+    final chatService = ChatService();
+    final currentUser = chatService.getCurrentUser();
+    final hasJoined =
+        currentUser != null && room.users.contains(currentUser.uid);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (room.isActive) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(chatRoom: room),
+              ),
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                Icons.chat_bubble_outline,
+                color: room.isActive ? Colors.purple : Colors.grey,
+                size: 32,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                room.name,
+                style: theme.textTheme.titleMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              Expanded(
+                child: Text(
+                  room.description,
+                  style: theme.textTheme.bodySmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(height: 8),
+              if (room.isActive) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.group,
+                      color: Colors.purple,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${room.users.length} members',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (!room.isActive) ...[
+                Row(
+                  children: [
+                    Icon(
+                      Icons.lock,
+                      color: Colors.grey,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Closed',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (room.isActive)
+                ElevatedButton(
+                  onPressed:
+                      hasJoined ? null : () => chatService.joinRoom(room.id),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.purple,
+                    minimumSize: const Size(double.infinity, 36),
+                  ),
+                  child: Text(hasJoined ? 'Joined' : 'Join'),
+                ),
+              // Oda aktif değilse bir bilgilendirme metni gösterebiliriz (opsiyonel)
+              if (!room.isActive)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Room is inactive',
+                    style:
+                        theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PollsTab extends StatelessWidget {
+  const PollsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final pollService = PollService();
+    Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: StreamBuilder<List<Poll>>(
+        stream: pollService.getActivePolls(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.poll_outlined, size: 48, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No active polls available'),
+                ],
+              ),
+            );
+          }
+
+          return ListView.separated(
+            itemCount: snapshot.data!.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final poll = snapshot.data![index];
+              return _buildPollCard(context, poll);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildPollCard(BuildContext context, Poll poll) {
+    final theme = Theme.of(context);
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final hasVoted = currentUser != null && poll.hasUserVoted(currentUser.uid);
+    final canShowResults =
+        currentUser != null && poll.canShowResults(currentUser.uid);
+    final totalVotes = canShowResults
+        ? poll.options.fold(0, (sum, option) => sum + option.votes)
+        : 0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Başlık alanı (artık sol taraftan 20 padding ile hizalı)
-            Padding(
-              padding: const EdgeInsets.only(top: 24, bottom: 8),
-              child: Text(
-                'Rooms',
-                style: theme.textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: customPurple,
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: poll.isActive ? Colors.green : Colors.grey,
+                  ),
                 ),
-              ),
+                Text(
+                  poll.isActive ? 'ACTIVE' : 'CLOSED',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1,
+                    color: poll.isActive ? Colors.green : Colors.grey,
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 12),
             Text(
-              'Join a conversation in our community rooms',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[300]
-                    : Colors.grey[700],
-              ),
+              poll.question,
+              style: theme.textTheme.titleLarge,
             ),
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Divider(),
-            ),
-            Expanded(
-              child: StreamBuilder<List<ChatRoom>>(
-                stream: _chatService.getChatRooms(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(
-                      child: CircularProgressIndicator(
-                        color: customPurple,
+            const SizedBox(height: 16),
+            ...poll.options.map((option) {
+              final percentage = canShowResults && totalVotes > 0
+                  ? (option.votes / totalVotes * 100).round()
+                  : 0;
+
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: hasVoted || !poll.isActive
+                        ? null
+                        : () async {
+                            try {
+                              await PollService()
+                                  .vote(poll.id, poll.options.indexOf(option));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content: Text('Vote submitted!')),
+                              );
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error: $e')),
+                              );
+                            }
+                          },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 16,
                       ),
-                    );
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Text('No chat rooms available.'),
-                    );
-                  }
-
-                  // Filter rooms based on active status if needed
-                  final rooms = _showInactiveRooms
-                      ? snapshot.data!
-                      : snapshot.data!.where((room) => room.isActive).toList();
-
-                  if (rooms.isEmpty) {
-                    return const Center(
-                      child: Text('No active chat rooms available.'),
-                    );
-                  }
-
-                  return GridView.builder(
-                    padding: const EdgeInsets.only(bottom: 20),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.85,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 16,
-                    ),
-                    itemCount: rooms.length,
-                    itemBuilder: (context, index) {
-                      final room = rooms[index];
-                      final cardColor = theme.brightness == Brightness.dark
-                          ? Colors.grey[850]
-                          : Colors.white;
-
-                      // Choose colors based on active status
-                      final roomColor =
-                          room.isActive ? customPurple : inactiveColor;
-                      // final statusText = room.isActive ? 'Active' : 'Passive';
-
-                      // Check if the current user has joined the room
-                      final currentUser = _chatService.getCurrentUser();
-                      final hasJoined = currentUser != null &&
-                          room.users.contains(currentUser.uid);
-
-                      return GestureDetector(
-                        onTap: () {
-                          // Only allow navigation to active rooms
-                          if (room.isActive) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ChatScreen(chatRoom: room),
-                              ),
-                            );
-                          } else {
-                            // Optionally show message for inactive rooms
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content:
-                                    Text('This room is currently inactive.'),
-                                backgroundColor: inactiveColor,
-                              ),
-                            );
-                          }
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: cardColor,
-                            borderRadius: BorderRadius.circular(20),
-                            // 3 boyutlu etkiyi artırmak için daha belirgin gölgeler
-                            boxShadow: [
-                              BoxShadow(
-                                color: roomColor.withOpacity(0.2),
-                                blurRadius: 15,
-                                spreadRadius: 1,
-                                offset: const Offset(5, 6),
-                              ),
-                              BoxShadow(
-                                color: roomColor.withOpacity(0.5),
-                                blurRadius: 2,
-                                spreadRadius: 0,
-                                offset: const Offset(0, 1),
-                              ),
-                            ],
-                            border: Border.all(
-                              color: roomColor.withOpacity(0.2),
-                              width: 1.5,
-                            ),
-                          ),
-                          // Apply opacity to inactive rooms
-                          child: Opacity(
-                            opacity: room.isActive ? 1.0 : 0.7,
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Oda ikonunu daha belirgin hale getirme
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: roomColor.withOpacity(0.15),
-                                      borderRadius: BorderRadius.circular(12),
-                                      // İkon konteynerını da 3 boyutlu göstermek için
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: roomColor.withOpacity(0.1),
-                                          blurRadius: 8,
-                                          spreadRadius: 1,
-                                          offset: const Offset(1, 1),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Icon(
-                                      Icons.mode_comment_rounded,
-                                      color: roomColor,
-                                      size: 30,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  Text(
-                                    room.name,
-                                    style:
-                                        theme.textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Expanded(
-                                    child: Text(
-                                      room.description,
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                        color:
-                                            theme.brightness == Brightness.dark
-                                                ? Colors.grey[400]
-                                                : Colors.grey[600],
-                                      ),
-                                      maxLines: 3,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  // Katılım sayısı veya aktif kişi göstergesi
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: roomColor.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          room.isActive
-                                              ? Icons.person
-                                              : Icons.person_off,
-                                          size: 14,
-                                          color: roomColor,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${room.users.length} / ${room.activeUsers.length}',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: roomColor,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ElevatedButton(
-                                    onPressed: hasJoined
-                                        ? null // Disable the button if already joined
-                                        : () {
-                                            _chatService.joinRoom(room.id);
-                                          },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: roomColor,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Text(
-                                        hasJoined ? 'Joined' : 'Join Room'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                      margin: const EdgeInsets.only(bottom: 8),
+                      decoration: BoxDecoration(
+                        color: hasVoted
+                            ? Colors.grey.withOpacity(0.1)
+                            : Colors.purple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: hasVoted
+                              ? Colors.grey.withOpacity(0.3)
+                              : Colors.purple.withOpacity(0.3),
                         ),
-                      );
-                    },
-                  );
-                },
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              option.text,
+                              style: TextStyle(
+                                color: hasVoted || !poll.isActive
+                                    ? Colors.grey
+                                    : Colors.purple,
+                              ),
+                            ),
+                          ),
+                          if (canShowResults)
+                            Text(
+                              '$percentage%',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.purple,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  if (canShowResults) ...[
+                    const SizedBox(height: 4),
+                    LinearProgressIndicator(
+                      value: totalVotes > 0 ? option.votes / totalVotes : 0,
+                      backgroundColor: Colors.grey[200],
+                      valueColor:
+                          const AlwaysStoppedAnimation<Color>(Colors.purple),
+                      minHeight: 4,
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ],
+              );
+            }),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasVoted ? Icons.check_circle : Icons.info,
+                    color: hasVoted ? Colors.green : Colors.purple,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasVoted
+                          ? canShowResults
+                              ? 'Total votes: $totalVotes'
+                              : 'Thanks for voting! Results coming soon.'
+                          : poll.isActive
+                              ? 'Select an option to vote'
+                              : 'This poll is closed',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
