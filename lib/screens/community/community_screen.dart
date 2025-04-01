@@ -196,7 +196,10 @@ class ChatRoomsTab extends StatelessWidget {
                     backgroundColor: Colors.purple,
                     minimumSize: const Size(double.infinity, 36),
                   ),
-                  child: Text(hasJoined ? 'Joined' : 'Join'),
+                  child: Text(
+                    hasJoined ? 'Joined' : 'Join',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               // Oda aktif değilse bir bilgilendirme metni gösterebiliriz (opsiyonel)
               if (!room.isActive)

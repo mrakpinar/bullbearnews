@@ -60,20 +60,24 @@ class MyApp extends StatelessWidget {
 
   ThemeData _buildLightTheme() {
     return ThemeData(
-      // Light tema ayarları
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: Colors.grey[100],
       colorScheme: ColorScheme.light(
-        primary: Colors.purple,
-        secondary: Colors.purpleAccent,
+        primary: Colors.purple[300]!,
+        secondary: Colors.purpleAccent[100]!,
+        background: Colors.grey[100]!,
       ),
     );
   }
 
   ThemeData _buildDarkTheme() {
     return ThemeData.dark().copyWith(
-      // Dark tema ayarları
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: Colors.grey[900],
       colorScheme: ColorScheme.dark(
-        primary: Colors.purple,
-        secondary: Colors.purpleAccent,
+        primary: Colors.purple[800]!,
+        secondary: Colors.purpleAccent[700]!,
+        background: Colors.grey[900]!,
       ),
     );
   }
