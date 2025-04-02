@@ -73,6 +73,20 @@ const noPolls = document.getElementById('no-polls');
 const deletePollModal = new bootstrap.Modal(document.getElementById('deletePollModal'));
 const confirmDeletePollButton = document.getElementById('confirm-delete-poll');
 
+// DOM elemanları - Duyurular
+const announcementForm = document.getElementById('announcement-form');
+const announcementTitleInput = document.getElementById('announcement-title');
+const announcementContentInput = document.getElementById('announcement-content');
+const announcementImageInput = document.getElementById('announcement-image');
+const announcementPreview = document.getElementById('announcement-preview');
+const announcementsList = document.getElementById('announcements-list');
+const refreshAnnouncementsButton = document.getElementById('refresh-announcements');
+const loadingAnnouncements = document.getElementById('loading-announcements');
+const noAnnouncements = document.getElementById('no-announcements');
+const deleteAnnouncementModal = new bootstrap.Modal(document.getElementById('deleteAnnouncementModal'));
+const confirmDeleteAnnouncementButton = document.getElementById('confirm-delete-announcement');
+
+
 // Auth durum değişikliğini izle
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -124,35 +138,6 @@ imageInput.addEventListener('change', event => {
     }
 });
 
-// Cloudinary'ye görsel yükleme
-const uploadImageToCloudinary = (file) => {
-    return new Promise((resolve, reject) => {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('upload_preset', 'upload_image');  // Cloudinary'deki upload preset
-        formData.append('api_key', cloudinaryConfig.apiKey);
-        
-        // Cloudinary API URL
-        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`;
-
-        // Fetch ile görseli Cloudinary'ye yükle
-        fetch(cloudinaryUrl, {
-            method: 'POST',
-            body: formData,
-        })
-        .then((response) => response.json())
-        .then((data) => {
-            if (data.secure_url) {
-                resolve(data.secure_url); // Yüklenen görselin URL'si
-            } else {
-                reject('Görsel yüklenirken bir hata oluştu');
-            }
-        })
-        .catch((error) => {
-            reject(error);
-        });
-    });
-};
 
 // Haber formunu gönder
 newsForm.addEventListener('submit', async event => {
@@ -782,5 +767,227 @@ refreshPollsButton.addEventListener('click', loadPolls);
 auth.onAuthStateChanged(user => {
     if (user) {
         loadPolls();
+    }
+});
+
+
+// Image preview for announcements
+announcementImageInput.addEventListener('change', event => {
+    const file = event.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            announcementPreview.src = e.target.result;
+            announcementPreview.classList.remove('d-none');
+        };
+        reader.readAsDataURL(file);
+    } else {
+        announcementPreview.classList.add('d-none');
+    }
+});
+
+// Upload image to Cloudinary
+const uploadImageToCloudinary = (file) => {
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('upload_preset', 'upload_image');
+        formData.append('api_key', cloudinaryConfig.apiKey);
+        
+        const cloudinaryUrl = `https://api.cloudinary.com/v1_1/${cloudinaryConfig.cloudName}/image/upload`;
+
+        fetch(cloudinaryUrl, {
+            method: 'POST',
+            body: formData,
+        })
+        .then((response) => response.json())
+        .then((data) => {
+            if (data.secure_url) {
+                resolve(data.secure_url);
+            } else {
+                reject('Error uploading image');
+            }
+        })
+        .catch((error) => {
+            reject(error);
+        });
+    });
+};
+
+// Announcement form submission
+announcementForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!auth.currentUser) {
+        alert('Please login to create announcements');
+        return;
+    }
+    
+    const title = announcementTitleInput.value.trim();
+    const content = announcementContentInput.value.trim();
+    const imageFile = announcementImageInput.files[0];
+    
+    if (!title || !content) {
+        alert('Please fill all required fields');
+        return;
+    }
+    
+    try {
+        let imageUrl = null;
+        
+        if (imageFile) {
+            imageUrl = await uploadImageToCloudinary(imageFile);
+        }
+        
+        await db.collection('announcements').add({
+            title,
+            content,
+            imageUrl,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            isActive: true,
+            createdBy: auth.currentUser.uid
+        });
+        
+        alert('Announcement created successfully!');
+        announcementForm.reset();
+        announcementPreview.classList.add('d-none');
+        loadAnnouncements();
+    } catch (error) {
+        console.error('Error creating announcement:', error);
+        alert('Error creating announcement: ' + error.message);
+    }
+});
+
+// Load announcements
+async function loadAnnouncements() {
+    if (!auth.currentUser) return;
+    
+    loadingAnnouncements.classList.remove('d-none');
+    noAnnouncements.classList.add('d-none');
+    announcementsList.innerHTML = '';
+    
+    try {
+        const snapshot = await db.collection('announcements')
+            .orderBy('createdAt', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            noAnnouncements.classList.remove('d-none');
+        } else {
+            snapshot.forEach(doc => {
+                const announcement = doc.data();
+                announcement.id = doc.id;
+                
+                const formattedDate = announcement.createdAt 
+                    ? new Date(announcement.createdAt.toDate()).toLocaleDateString()
+                    : 'N/A';
+                
+                const statusClass = announcement.isActive ? 'bg-success' : 'bg-danger';
+                const statusText = announcement.isActive ? 'Active' : 'Inactive';
+                const toggleBtnText = announcement.isActive ? 'Deactivate' : 'Activate';
+                const toggleBtnClass = announcement.isActive ? 'btn-warning' : 'btn-success';
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${announcement.title}</td>
+                    <td>${announcement.content.substring(0, 50)}${announcement.content.length > 50 ? '...' : ''}</td>
+                    <td>${formattedDate}</td>
+                    <td><span class="badge ${statusClass}">${statusText}</span></td>
+                    <td>
+                        <div class="btn-group btn-group-sm">
+                            <button class="btn btn-sm ${toggleBtnClass} toggle-announcement-status" 
+                                    data-id="${announcement.id}" data-status="${announcement.isActive}">
+                                ${toggleBtnText}
+                            </button>
+                            <button class="btn btn-sm btn-danger delete-announcement" 
+                                    data-id="${announcement.id}">
+                                Delete
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                announcementsList.appendChild(row);
+            });
+            
+            // Add event listeners for delete buttons
+            document.querySelectorAll('.delete-announcement').forEach(button => {
+                button.addEventListener('click', event => {
+                    const announcementId = event.target.getAttribute('data-id');
+                    confirmDeleteAnnouncementButton.setAttribute('data-id', announcementId);
+                    deleteAnnouncementModal.show();
+                });
+            });
+            
+            // Add event listeners for status toggle buttons
+            document.querySelectorAll('.toggle-announcement-status').forEach(button => {
+                button.addEventListener('click', async (event) => {
+                    const announcementId = event.target.getAttribute('data-id');
+                    const currentStatus = event.target.getAttribute('data-status') === 'true';
+                    
+                    try {
+                        await db.collection('announcements').doc(announcementId).update({
+                            isActive: !currentStatus
+                        });
+                        alert(`Announcement ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+                        loadAnnouncements();
+                    } catch (error) {
+                        console.error('Error updating announcement status:', error);
+                        alert('Error updating announcement status: ' + error.message);
+                    }
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Error loading announcements:', error);
+        alert('Error loading announcements: ' + error.message);
+    } finally {
+        loadingAnnouncements.classList.add('d-none');
+    }
+}
+
+// Delete announcement
+confirmDeleteAnnouncementButton.addEventListener('click', async () => {
+    const announcementId = confirmDeleteAnnouncementButton.getAttribute('data-id');
+    
+    if (!announcementId) {
+        deleteAnnouncementModal.hide();
+        return;
+    }
+    
+    try {
+        await db.collection('announcements').doc(announcementId).delete();
+        alert('Announcement deleted successfully');
+        loadAnnouncements();
+    } catch (error) {
+        console.error('Error deleting announcement:', error);
+        alert('Error deleting announcement: ' + error.message);
+    } finally {
+        deleteAnnouncementModal.hide();
+    }
+});
+
+// Refresh announcements
+refreshAnnouncementsButton.addEventListener('click', loadAnnouncements);
+
+// Auth state listener
+auth.onAuthStateChanged(user => {
+    if (user) {
+        loginContainer.classList.add('d-none');
+        userInfo.classList.remove('d-none');
+        userEmail.textContent = user.email;
+        authRequired.classList.add('d-none');
+        adminContent.classList.remove('d-none');
+        
+        // Load all data
+        loadNews();
+        loadChatRooms();
+        loadPolls();
+        loadAnnouncements();
+    } else {
+        loginContainer.classList.remove('d-none');
+        userInfo.classList.add('d-none');
+        authRequired.classList.remove('d-none');
+        adminContent.classList.add('d-none');
     }
 });

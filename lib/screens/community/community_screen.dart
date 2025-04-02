@@ -1,10 +1,13 @@
+import 'package:bullbearnews/models/announcement_model.dart';
 import 'package:bullbearnews/models/poll_model.dart';
+import 'package:bullbearnews/services/announcement_service.dart';
 import 'package:bullbearnews/services/poll_serivice.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
 import 'chat_screen.dart';
 import '../../services/chat_service.dart';
+import 'package:intl/intl.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -20,7 +23,7 @@ class _CommunityScreenState extends State<CommunityScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -33,16 +36,23 @@ class _CommunityScreenState extends State<CommunityScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Community'),
+        title: const Text(
+          'Community',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.purple,
           labelColor: Colors.purple,
           unselectedLabelColor: Colors.grey,
+          isScrollable: true,
           tabs: const [
             Tab(icon: Icon(Icons.forum_outlined), text: 'Chat Rooms'),
             Tab(icon: Icon(Icons.poll_outlined), text: 'Polls'),
+            Tab(icon: Icon(Icons.announcement_outlined), text: 'Announcements'),
           ],
         ),
       ),
@@ -51,6 +61,7 @@ class _CommunityScreenState extends State<CommunityScreen>
         children: const [
           ChatRoomsTab(),
           PollsTab(),
+          AnnouncementsTab(),
         ],
       ),
     );
@@ -426,5 +437,127 @@ class PollsTab extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class AnnouncementsTab extends StatelessWidget {
+  const AnnouncementsTab({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final announcementService = AnnouncementService();
+    Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: StreamBuilder<List<Announcement>>(
+        stream: announcementService.getActiveAnnouncements(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.announcement_outlined,
+                      size: 48, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No announcements available'),
+                ],
+              ),
+            );
+          }
+
+          return ListView.separated(
+            itemCount: snapshot.data!.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 16),
+            itemBuilder: (context, index) {
+              final announcement = snapshot.data![index];
+              return _buildAnnouncementCard(context, announcement);
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAnnouncementCard(
+      BuildContext context, Announcement announcement) {
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.campaign, color: Colors.orange),
+                const SizedBox(width: 8),
+                Text(
+                  'ANNOUNCEMENT',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1,
+                    color: Colors.orange,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatDate(announcement.createdAt),
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              announcement.title,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              announcement.content,
+              style: theme.textTheme.bodyMedium,
+            ),
+            if (announcement.imageUrl != null) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  announcement.imageUrl!,
+                  width: double.infinity,
+                  height: 150,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 150,
+                    color: Colors.grey[200],
+                    child: const Center(child: Icon(Icons.broken_image)),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatDate(DateTime date) {
+    return DateFormat('MMM dd, yyyy').format(date);
   }
 }
