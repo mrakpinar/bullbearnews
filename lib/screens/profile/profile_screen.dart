@@ -2,6 +2,7 @@ import 'package:bullbearnews/screens/profile/add_to_wallet_screen.dart';
 import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
 import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
+import 'package:bullbearnews/widgets/portfolio_pie_chart.dart';
 import 'package:bullbearnews/widgets/saved_news_list.dart';
 import 'package:bullbearnews/widgets/user_profile_header.dart';
 import 'package:bullbearnews/widgets/wallet_summary_card.dart';
@@ -345,6 +346,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   totalProfitLossPercentage: _totalProfitLossPercentage,
                   onAddToWallet: _addToWallet,
                   onShowDetails: _showPortfolioDetails,
+                ),
+                const SizedBox(height: 24),
+                FutureBuilder<List<CryptoModel>>(
+                  future: _cryptoService.getCryptoData(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    return PortfolioPieChart(
+                      walletItems: _walletItems,
+                      allCryptos: snapshot.data!,
+                    );
+                  },
                 ),
                 const SizedBox(height: 32),
                 FavoriteCryptosList(
