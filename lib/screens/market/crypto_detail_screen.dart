@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/market/trading_view_chart.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../../models/crypto_model.dart';
@@ -10,53 +11,345 @@ class CryptoDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPositive = crypto.priceChangePercentage24h >= 0;
-    Theme.of(context);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(crypto.name),
+      body: CustomScrollView(
+        slivers: [
+          _buildAppBar(context),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Coin header and price info in a card
+                  _buildHeaderCard(isPositive, theme),
+                  const SizedBox(height: 16),
+
+                  // Price chart
+                  _buildPriceChart(),
+                  const SizedBox(height: 16),
+
+                  // Market details
+                  _buildMarketDetailsCard(theme),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-      body: SingleChildScrollView(
+    );
+  }
+
+  Widget _buildAppBar(BuildContext context) {
+    return SliverAppBar(
+      expandedHeight: 120,
+      pinned: true,
+      flexibleSpace: FlexibleSpaceBar(
+        title: Text(
+          crypto.name,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+          ),
+        ),
+        titlePadding: const EdgeInsets.only(left: 72, bottom: 16),
+        background: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.7),
+                Colors.black.withOpacity(0.1),
+              ],
+            ),
+          ),
+        ),
+      ),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.star_border),
+          onPressed: () {},
+        ),
+        IconButton(
+          icon: const Icon(Icons.share),
+          onPressed: () {},
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderCard(bool isPositive, ThemeData theme) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Coin image and symbol
-            _buildCoinHeader(),
-            const SizedBox(height: 24),
+            // Top row with coin image and basic info
+            Row(
+              children: [
+                // Coin image
+                Hero(
+                  tag: 'crypto-${crypto.id}',
+                  child: CachedNetworkImage(
+                    imageUrl: crypto.image,
+                    width: 60,
+                    height: 60,
+                    placeholder: (context, url) =>
+                        const CircularProgressIndicator(),
+                    errorWidget: (context, url, error) => const Icon(
+                      Icons.currency_bitcoin,
+                      size: 60,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
 
-            // Price information
-            _buildPriceSection(isPositive),
-            const SizedBox(height: 24),
+                // Symbol and name
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        crypto.symbol.toUpperCase(),
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        crypto.name,
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: theme.textTheme.bodyMedium?.color
+                              ?.withOpacity(0.7),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
 
-            // Market details
-            _buildMarketDetails(),
+            const Divider(height: 32),
+
+            // Price section
+            Row(
+              children: [
+                // Current price
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Current Price',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '\$${_formatPrice(crypto.currentPrice)}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 24h change
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: isPositive
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isPositive ? Icons.arrow_upward : Icons.arrow_downward,
+                        color: isPositive ? Colors.green : Colors.red,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                        style: TextStyle(
+                          color: isPositive ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCoinHeader() {
-    return Center(
-      child: Column(
+  Widget _buildPriceChart() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Price Chart',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                _buildTimeframeSelector(),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TradingViewChart(
+              symbol: crypto.symbol,
+              theme: 'dark',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeframeSelector() {
+    return Container(
+      height: 32,
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
         children: [
-          CachedNetworkImage(
-            imageUrl: crypto.image,
-            width: 100,
-            height: 100,
-            placeholder: (context, url) => const CircularProgressIndicator(),
-            errorWidget: (context, url, error) => const Icon(
-              Icons.currency_bitcoin,
-              size: 100,
-              color: Colors.grey,
+          for (final period in ['1D', '1W', '1M', '1Y', 'All'])
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: TextButton(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  backgroundColor: period == '1M' ? Colors.blue : null,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {},
+                child: Text(
+                  period,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: period == '1M' ? Colors.white : Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarketDetailsCard(ThemeData theme) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Market Details',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Stats grid
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.5,
+              mainAxisSpacing: 16,
+              crossAxisSpacing: 16,
+              children: [
+                _buildStatItem('Market Cap',
+                    '\$${_formatNumber(crypto.marketCap)}', theme),
+                _buildStatItem('24H Volume',
+                    '\$${_formatNumber(crypto.totalVolume)}', theme),
+                _buildStatItem(
+                    'All-Time High', '\$${_formatPrice(crypto.ath)}', theme),
+                _buildStatItem(
+                    'All-Time Low', '\$${_formatPrice(crypto.atl)}', theme),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+            const Divider(),
+            const SizedBox(height: 16),
+
+            // Supply details
+            _buildSupplySection()
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem(String label, String value, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: theme.cardColor.withOpacity(0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            crypto.symbol.toUpperCase(),
+            value,
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -65,76 +358,71 @@ class CryptoDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPriceSection(bool isPositive) {
+  Widget _buildSupplySection() {
+    final circulating = crypto.circulatingSupply;
+    final total = crypto
+        .totalVolume; // Fallback if null ** Burada supply yerine total volume var doğru mu bilemiyorum.
+    final percentCirculating = (circulating / total * 100).clamp(0, 100);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          '\$${_formatPrice(crypto.currentPrice)}',
-          style: const TextStyle(
-            fontSize: 32,
+        const Text(
+          'Supply',
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 8),
         Row(
           children: [
-            Icon(
-              isPositive ? Icons.arrow_upward : Icons.arrow_downward,
-              color: isPositive ? Colors.green : Colors.red,
-              size: 20,
+            Expanded(
+              flex: 3,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Circulating Supply',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    '${_formatNumber(circulating)} ${crypto.symbol.toUpperCase()}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(width: 4),
-            Text(
-              '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
-              style: TextStyle(
-                color: isPositive ? Colors.green : Colors.red,
-                fontSize: 18,
+            Expanded(
+              flex: 2,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total Supply',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  Text(
+                    _formatNumber(total),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
             ),
           ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildMarketDetails() {
-    return Column(
-      children: [
-        _buildDetailRow('Market Cap', '\$${_formatNumber(crypto.marketCap)}'),
-        _buildDetailRow('24H Volume', '\$${_formatNumber(crypto.totalVolume)}'),
-        _buildDetailRow(
-          'Circulating Supply',
-          '${_formatNumber(crypto.circulatingSupply)} ${crypto.symbol.toUpperCase()}',
+        const SizedBox(height: 12),
+        LinearProgressIndicator(
+          value: percentCirculating / 100,
+          backgroundColor: Colors.grey.withOpacity(0.2),
+          valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
         ),
-        _buildDetailRow('All-Time High', '\$${_formatPrice(crypto.ath)}'),
-        _buildDetailRow('All-Time Low', '\$${_formatPrice(crypto.atl)}'),
+        const SizedBox(height: 4),
+        Text(
+          '${percentCirculating.toStringAsFixed(1)}% of total supply in circulation',
+          style: const TextStyle(fontSize: 12, color: Colors.grey),
+        ),
       ],
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
