@@ -54,6 +54,7 @@ dependencies:
   webview_flutter: ^4.10.0
   webview_flutter_wkwebview: ^3.18.5
   fl_chart: ^0.70.2
+  emoji_picker_flutter: ^4.3.0
 
 dev_dependencies:
   flutter_test:

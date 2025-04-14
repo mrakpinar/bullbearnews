@@ -1,16 +1,71 @@
+import 'package:bullbearnews/models/price_alert_model.dart';
 import 'package:bullbearnews/screens/market/trading_view_chart.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/crypto_model.dart';
 
-class CryptoDetailScreen extends StatelessWidget {
+class CryptoDetailScreen extends StatefulWidget {
   final CryptoModel crypto;
 
   const CryptoDetailScreen({super.key, required this.crypto});
 
   @override
+  State<CryptoDetailScreen> createState() => _CryptoDetailScreenState();
+}
+
+class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
+  final TextEditingController _priceAlertController = TextEditingController();
+  final List<PriceAlert> _priceAlerts = [];
+  late CryptoModel _crypto; // Local copy to update favorite status
+  Set<String> _favoriteCryptos = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _crypto = widget.crypto;
+    _priceAlertController.text = _crypto.currentPrice.toString();
+    _loadFavorites();
+  }
+
+  @override
+  void dispose() {
+    _priceAlertController.dispose();
+    super.dispose();
+  }
+
+  // Favori kriptoları yükle
+  Future<void> _loadFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _favoriteCryptos =
+          Set<String>.from(prefs.getStringList('favoriteCryptos') ?? []);
+      _crypto.isFavorite = _favoriteCryptos.contains(_crypto.id);
+    });
+  }
+
+  // Favori durumunu kaydet
+  Future<void> _saveFavorites() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('favoriteCryptos', _favoriteCryptos.toList());
+  }
+
+  // Favori durumunu değiştir
+  Future<void> _toggleFavorite() async {
+    setState(() {
+      _crypto.isFavorite = !_crypto.isFavorite;
+      if (_crypto.isFavorite) {
+        _favoriteCryptos.add(_crypto.id);
+      } else {
+        _favoriteCryptos.remove(_crypto.id);
+      }
+    });
+    await _saveFavorites();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isPositive = crypto.priceChangePercentage24h >= 0;
+    final isPositive = _crypto.priceChangePercentage24h >= 0;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -31,6 +86,10 @@ class CryptoDetailScreen extends StatelessWidget {
                   _buildPriceChart(),
                   const SizedBox(height: 16),
 
+                  // Price Alert Card
+                  _buildPriceAlertCard(theme),
+                  const SizedBox(height: 16),
+
                   // Market details
                   _buildMarketDetailsCard(theme),
                 ],
@@ -48,7 +107,7 @@ class CryptoDetailScreen extends StatelessWidget {
       pinned: true,
       flexibleSpace: FlexibleSpaceBar(
         title: Text(
-          crypto.name,
+          _crypto.name,
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -74,12 +133,22 @@ class CryptoDetailScreen extends StatelessWidget {
       ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.star_border),
-          onPressed: () {},
+          icon: Icon(
+            widget.crypto.isFavorite ? Icons.star : Icons.star_border,
+            color: widget.crypto.isFavorite ? Colors.amber : Colors.white,
+          ),
+          onPressed: _toggleFavorite,
         ),
         IconButton(
           icon: const Icon(Icons.share),
           onPressed: () {},
+        ),
+        IconButton(
+          icon: const Icon(Icons.notifications_none),
+          onPressed: () {
+            // Mevcut alarmları göster
+            _showAlertsDialog(context);
+          },
         ),
       ],
     );
@@ -98,9 +167,9 @@ class CryptoDetailScreen extends StatelessWidget {
               children: [
                 // Coin image
                 Hero(
-                  tag: 'crypto-${crypto.id}',
+                  tag: 'crypto-${widget.crypto.id}',
                   child: CachedNetworkImage(
-                    imageUrl: crypto.image,
+                    imageUrl: widget.crypto.image,
                     width: 60,
                     height: 60,
                     placeholder: (context, url) =>
@@ -120,14 +189,14 @@ class CryptoDetailScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        crypto.symbol.toUpperCase(),
+                        widget.crypto.symbol.toUpperCase(),
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        crypto.name,
+                        widget.crypto.name,
                         style: TextStyle(
                           fontSize: 16,
                           color: theme.textTheme.bodyMedium?.color
@@ -159,7 +228,7 @@ class CryptoDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '\$${_formatPrice(crypto.currentPrice)}',
+                        '\$${_formatPrice(widget.crypto.currentPrice)}',
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -188,7 +257,7 @@ class CryptoDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                        '${isPositive ? '+' : ''}${widget.crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
                         style: TextStyle(
                           color: isPositive ? Colors.green : Colors.red,
                           fontWeight: FontWeight.bold,
@@ -230,11 +299,247 @@ class CryptoDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             TradingViewChart(
-              symbol: crypto.symbol,
+              symbol: widget.crypto.symbol,
               theme: 'dark',
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPriceAlertCard(ThemeData theme) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Price Alerts',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (_priceAlerts.isNotEmpty)
+                  TextButton(
+                    onPressed: () => _showAlertsDialog(context),
+                    child: Text(
+                      'Available Alerts (${_priceAlerts.length})',
+                      style: TextStyle(
+                        color: theme.primaryColor,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Aşağıdaki Row'u esnek bir yapıya dönüştürüyoruz
+            Column(
+              children: [
+                // İlk olarak dropdown seçeneği
+                _buildAlertTypeDropdown(),
+                const SizedBox(height: 16),
+                // Ardından fiyat giriş alanı
+                TextField(
+                  controller: _priceAlertController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: 'Target Price',
+                    prefixText: '\$',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 16),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _addPriceAlert,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.grey[800],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Set Price Alert',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Alert type için dropdown widget (above/below)
+  String _selectedAlertType = 'above'; // Varsayılan değer
+
+  Widget _buildAlertTypeDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          isExpanded: true,
+          value: _selectedAlertType,
+          items: [
+            DropdownMenuItem(
+              value: 'above',
+              child: Row(
+                children: [
+                  const Icon(Icons.arrow_upward, color: Colors.green, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('Above'),
+                ],
+              ),
+            ),
+            DropdownMenuItem(
+              value: 'below',
+              child: Row(
+                children: [
+                  const Icon(Icons.arrow_downward, color: Colors.red, size: 18),
+                  const SizedBox(width: 8),
+                  const Text('Below'),
+                ],
+              ),
+            ),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _selectedAlertType = value!;
+            });
+          },
+        ),
+      ),
+    );
+  }
+
+  void _addPriceAlert() {
+    // Fiyat değerini kontrol et
+    double? alertPrice = double.tryParse(_priceAlertController.text);
+
+    if (alertPrice == null) {
+      _showErrorSnackBar('Please enter a valid price');
+      return;
+    }
+
+    // Mevcut fiyatla karşılaştır
+    double currentPrice = widget.crypto.currentPrice;
+
+    // "above" seçildiyse ve hedef fiyat mevcut fiyattan düşükse uyarı ver
+    if (_selectedAlertType == 'above' && alertPrice <= currentPrice) {
+      _showErrorSnackBar('Target price must be higher than current price');
+      return;
+    }
+
+    // "below" seçildiyse ve hedef fiyat mevcut fiyattan yüksekse uyarı ver
+    if (_selectedAlertType == 'below' && alertPrice >= currentPrice) {
+      _showErrorSnackBar('Target price must be lower than current price');
+      return;
+    }
+
+    // Yeni alarm ekle
+    final newAlert = PriceAlert(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      cryptoId: widget.crypto.id,
+      cryptoSymbol: widget.crypto.symbol,
+      targetPrice: alertPrice,
+      isAbove: _selectedAlertType == 'above',
+      createdAt: DateTime.now(),
+    );
+
+    setState(() {
+      _priceAlerts.add(newAlert);
+    });
+
+    // Başarılı mesajı göster
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '${widget.crypto.symbol.toUpperCase()} for ${_selectedAlertType == 'above' ? 'above' : 'below'} alarm set: \$${_formatPrice(alertPrice)}',
+        ),
+        backgroundColor: Colors.green,
+      ),
+    );
+
+    // Burada gerçek bir uygulamada, bu alarmı bir veritabanına kaydedersiniz
+    // ve bir bildirim servisine bağlarsınız
+  }
+
+  void _showAlertsDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Price Alerts'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: _priceAlerts.isEmpty
+              ? const Center(
+                  child: Text('No alerts set yet'),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _priceAlerts.length,
+                  itemBuilder: (context, index) {
+                    final alert = _priceAlerts[index];
+                    return ListTile(
+                      leading: Icon(
+                        alert.isAbove
+                            ? Icons.arrow_upward
+                            : Icons.arrow_downward,
+                        color: alert.isAbove ? Colors.green : Colors.red,
+                      ),
+                      title: Text(
+                        '${widget.crypto.symbol.toUpperCase()} ${alert.isAbove ? 'when above' : 'when below'}',
+                      ),
+                      subtitle: Text('\$${_formatPrice(alert.targetPrice)}'),
+                      trailing: IconButton(
+                        icon:
+                            const Icon(Icons.delete_outline, color: Colors.red),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          setState(() {
+                            _priceAlerts.removeAt(index);
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Alert removed'),
+                            ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
       ),
     );
   }
@@ -246,33 +551,37 @@ class CryptoDetailScreen extends StatelessWidget {
         color: Colors.grey.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        children: [
-          for (final period in ['1D', '1W', '1M', '1Y', 'All'])
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2),
-              child: TextButton(
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  backgroundColor: period == '1M' ? Colors.blue : null,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final period in ['1D', '1W', '1M', '1Y', 'All'])
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: TextButton(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    backgroundColor: period == '1M' ? Colors.blue : null,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                onPressed: () {},
-                child: Text(
-                  period,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: period == '1M' ? Colors.white : Colors.grey,
-                    fontWeight: FontWeight.bold,
+                  onPressed: () {},
+                  child: Text(
+                    period,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: period == '1M' ? Colors.white : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -305,13 +614,13 @@ class CryptoDetailScreen extends StatelessWidget {
               crossAxisSpacing: 16,
               children: [
                 _buildStatItem('Market Cap',
-                    '\$${_formatNumber(crypto.marketCap)}', theme),
+                    '\$${_formatNumber(widget.crypto.marketCap)}', theme),
                 _buildStatItem('24H Volume',
-                    '\$${_formatNumber(crypto.totalVolume)}', theme),
-                _buildStatItem(
-                    'All-Time High', '\$${_formatPrice(crypto.ath)}', theme),
-                _buildStatItem(
-                    'All-Time Low', '\$${_formatPrice(crypto.atl)}', theme),
+                    '\$${_formatNumber(widget.crypto.totalVolume)}', theme),
+                _buildStatItem('All-Time High',
+                    '\$${_formatPrice(widget.crypto.ath)}', theme),
+                _buildStatItem('All-Time Low',
+                    '\$${_formatPrice(widget.crypto.atl)}', theme),
               ],
             ),
 
@@ -359,8 +668,8 @@ class CryptoDetailScreen extends StatelessWidget {
   }
 
   Widget _buildSupplySection() {
-    final circulating = crypto.circulatingSupply;
-    final total = crypto
+    final circulating = widget.crypto.circulatingSupply;
+    final total = widget.crypto
         .totalVolume; // Fallback if null ** Burada supply yerine total volume var doğru mu bilemiyorum.
     final percentCirculating = (circulating / total * 100).clamp(0, 100);
 
@@ -387,7 +696,7 @@ class CryptoDetailScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   Text(
-                    '${_formatNumber(circulating)} ${crypto.symbol.toUpperCase()}',
+                    '${_formatNumber(circulating)} ${widget.crypto.symbol.toUpperCase()}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -447,5 +756,14 @@ class CryptoDetailScreen extends StatelessWidget {
     } else {
       return price.toStringAsFixed(0);
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 }
