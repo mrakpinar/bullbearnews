@@ -991,3 +991,188 @@ auth.onAuthStateChanged(user => {
         adminContent.classList.add('d-none');
     }
 });
+
+
+// DOM elemanları - YouTube Videoları
+const videoForm = document.getElementById('video-form');
+const videoTitleInput = document.getElementById('video-title');
+const videoUrlInput = document.getElementById('video-url');
+const videoDescriptionInput = document.getElementById('video-description');
+const videoCategorySelect = document.getElementById('video-category');
+const videoPreviewContainer = document.getElementById('video-preview-container');
+const videoPreview = document.getElementById('video-preview');
+const addVideoButton = document.getElementById('add-video-button');
+const refreshVideosButton = document.getElementById('refresh-videos');
+const videosList = document.getElementById('videos-list');
+const loadingVideos = document.getElementById('loading-videos');
+const noVideos = document.getElementById('no-videos');
+const deleteVideoModal = new bootstrap.Modal(document.getElementById('deleteVideoModal'));
+const confirmDeleteVideoButton = document.getElementById('confirm-delete-video');
+
+// YouTube video ID çıkarma fonksiyonu
+function extractYouTubeID(url) {
+    if (!url) return null;
+    
+    // Eğer sadece ID girilmişse
+    if (url.length === 11) return url;
+    
+    // Normal YouTube URL'sinden ID çıkarma
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+}
+
+// Video URL'si değiştiğinde önizleme göster
+videoUrlInput.addEventListener('input', () => {
+    const videoID = extractYouTubeID(videoUrlInput.value.trim());
+    
+    if (videoID) {
+        const embedHtml = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${videoID}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+        videoPreview.innerHTML = embedHtml;
+        videoPreviewContainer.classList.remove('d-none');
+    } else {
+        videoPreviewContainer.classList.add('d-none');
+    }
+});
+
+// Video formunu gönder
+videoForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    if (!auth.currentUser) {
+        alert('Video eklemek için giriş yapmalısınız.');
+        return;
+    }
+    
+    const title = videoTitleInput.value.trim();
+    const url = videoUrlInput.value.trim();
+    const description = videoDescriptionInput.value.trim();
+    const category = videoCategorySelect.value;
+    
+    const videoID = extractYouTubeID(url);
+    
+    if (!title || !videoID || !category) {
+        alert('Lütfen gerekli alanları doldurun ve geçerli bir YouTube URL\'si girin.');
+        return;
+    }
+    
+    try {
+        addVideoButton.disabled = true;
+        
+        await db.collection('videos').add({
+            title,
+            videoID,
+            description,
+            category,
+            thumbnailUrl: `https://img.youtube.com/vi/${videoID}/mqdefault.jpg`,
+            publishDate: firebase.firestore.FieldValue.serverTimestamp(),
+            addedBy: auth.currentUser.uid,
+            addedByEmail: auth.currentUser.email
+        });
+        
+        alert('Video başarıyla eklendi.');
+        videoForm.reset();
+        videoPreviewContainer.classList.add('d-none');
+        loadVideos();
+    } catch (error) {
+        console.error('Video ekleme hatası:', error);
+        alert('Video eklenirken bir hata oluştu: ' + error.message);
+    } finally {
+        addVideoButton.disabled = false;
+    }
+});
+
+// Videoları yükle
+async function loadVideos() {
+    if (!auth.currentUser) return;
+    
+    loadingVideos.classList.remove('d-none');
+    noVideos.classList.add('d-none');
+    videosList.innerHTML = '';
+    
+    try {
+        const snapshot = await db.collection('videos')
+            .orderBy('publishDate', 'desc')
+            .get();
+        
+        if (snapshot.empty) {
+            noVideos.classList.remove('d-none');
+        } else {
+            snapshot.forEach(doc => {
+                const video = doc.data();
+                video.id = doc.id;
+                
+                // Tarih formatla
+                let formattedDate = 'Tarih bilgisi yok';
+                if (video.publishDate) {
+                    const date = video.publishDate.toDate();
+                    formattedDate = `${date.getDate()}.${date.getMonth() + 1}.${date.getFullYear()}`;
+                }
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="align-middle">
+                        <img src="${video.thumbnailUrl}" alt="${video.title}" class="video-thumbnail" 
+                        style="width: 120px; height: 68px; object-fit: cover; border-radius: 4px;">
+                    </td>
+                    <td class="align-middle">
+                        <strong>${video.title}</strong>
+                        ${video.description ? `<p class="small text-muted mb-0">${video.description.substring(0, 80)}${video.description.length > 80 ? '...' : ''}</p>` : ''}
+                    </td>
+                    <td class="align-middle">${video.category}</td>
+                    <td class="align-middle">${formattedDate}</td>
+                    <td class="align-middle">
+                        <button class="btn btn-sm btn-danger delete-video" data-id="${video.id}">Sil</button>
+                    </td>
+                `;
+                
+                videosList.appendChild(row);
+            });
+            
+            // Silme butonlarına event listener ekle
+            document.querySelectorAll('.delete-video').forEach(button => {
+                button.addEventListener('click', event => {
+                    const videoId = event.target.getAttribute('data-id');
+                    confirmDeleteVideoButton.setAttribute('data-id', videoId);
+                    deleteVideoModal.show();
+                });
+            });
+        }
+    } catch (error) {
+        console.error('Video yükleme hatası:', error);
+        alert('Videolar yüklenirken bir hata oluştu: ' + error.message);
+    } finally {
+        loadingVideos.classList.add('d-none');
+    }
+}
+
+// Yenile butonuna tıklama
+refreshVideosButton.addEventListener('click', loadVideos);
+
+// Video silme işlemi
+confirmDeleteVideoButton.addEventListener('click', async () => {
+    const videoId = confirmDeleteVideoButton.getAttribute('data-id');
+    
+    if (!videoId) {
+        deleteVideoModal.hide();
+        return;
+    }
+    
+    try {
+        await db.collection('videos').doc(videoId).delete();
+        alert('Video başarıyla silindi.');
+        loadVideos();
+    } catch (error) {
+        console.error('Video silme hatası:', error);
+        alert('Video silinirken bir hata oluştu: ' + error.message);
+    } finally {
+        deleteVideoModal.hide();
+    }
+});
+
+// Auth durum değişikliğinde videoları da yükle
+auth.onAuthStateChanged(user => {
+    if (user) {
+        loadVideos(); // Diğer yükleme işlemlerine ek olarak
+    }
+});

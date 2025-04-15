@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/videos/videos_screen.dart';
 import 'package:flutter/material.dart';
 import 'home/home_screen.dart';
 import 'market/market_screen.dart';
@@ -19,6 +20,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   final List<Widget> _screens = const [
     HomeScreen(),
     MarketScreen(),
+    VideosScreen(),
     CommunityScreen(),
     ProfileScreen(),
   ];
@@ -73,6 +75,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           icon: Icon(Icons.show_chart_outlined),
           selectedIcon: Icon(Icons.show_chart),
           label: 'Market',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.video_library_outlined),
+          selectedIcon: Icon(Icons.video_library_rounded),
+          label: 'Videos',
         ),
         NavigationDestination(
           icon: Icon(Icons.group_outlined),

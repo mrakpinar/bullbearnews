@@ -55,6 +55,7 @@ dependencies:
   webview_flutter_wkwebview: ^3.18.5
   fl_chart: ^0.70.2
   emoji_picker_flutter: ^4.3.0
+  youtube_player_flutter: ^9.1.1
 
 dev_dependencies:
   flutter_test:
