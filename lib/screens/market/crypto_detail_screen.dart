@@ -1,5 +1,6 @@
 import 'package:bullbearnews/models/price_alert_model.dart';
 import 'package:bullbearnews/screens/market/trading_view_chart.dart';
+import 'package:bullbearnews/services/price_alert_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,15 +17,27 @@ class CryptoDetailScreen extends StatefulWidget {
 
 class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   final TextEditingController _priceAlertController = TextEditingController();
-  final List<PriceAlert> _priceAlerts = [];
-  late CryptoModel _crypto; // Local copy to update favorite status
+  final PriceAlertService _priceAlertService = PriceAlertService();
+  late Stream<List<PriceAlert>> _priceAlertsStream;
+  late CryptoModel _crypto;
   Set<String> _favoriteCryptos = {};
+  String _selectedAlertType = 'above';
 
   @override
   void initState() {
     super.initState();
     _crypto = widget.crypto;
     _priceAlertController.text = _crypto.currentPrice.toString();
+
+    debugPrint('Loading alerts for crypto: ${_crypto.id}');
+    _priceAlertsStream = _priceAlertService.getAlertsForCrypto(_crypto.id)
+      ..listen((alerts) {
+        debugPrint('Alerts updated: ${alerts.length} items');
+        for (var alert in alerts) {
+          debugPrint('Alert: ${alert.cryptoSymbol} - \$${alert.targetPrice}');
+        }
+      });
+
     _loadFavorites();
   }
 
@@ -34,7 +47,6 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     super.dispose();
   }
 
-  // Favori kriptoları yükle
   Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -44,13 +56,11 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     });
   }
 
-  // Favori durumunu kaydet
   Future<void> _saveFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('favoriteCryptos', _favoriteCryptos.toList());
   }
 
-  // Favori durumunu değiştir
   Future<void> _toggleFavorite() async {
     setState(() {
       _crypto.isFavorite = !_crypto.isFavorite;
@@ -78,19 +88,12 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Coin header and price info in a card
                   _buildHeaderCard(isPositive, theme),
                   const SizedBox(height: 16),
-
-                  // Price chart
                   _buildPriceChart(),
                   const SizedBox(height: 16),
-
-                  // Price Alert Card
                   _buildPriceAlertCard(theme),
                   const SizedBox(height: 16),
-
-                  // Market details
                   _buildMarketDetailsCard(theme),
                 ],
               ),
@@ -134,8 +137,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       actions: [
         IconButton(
           icon: Icon(
-            widget.crypto.isFavorite ? Icons.star : Icons.star_border,
-            color: widget.crypto.isFavorite ? Colors.amber : Colors.white,
+            _crypto.isFavorite ? Icons.star : Icons.star_border,
+            color: _crypto.isFavorite ? Colors.amber : Colors.white,
           ),
           onPressed: _toggleFavorite,
         ),
@@ -145,10 +148,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
         ),
         IconButton(
           icon: const Icon(Icons.notifications_none),
-          onPressed: () {
-            // Mevcut alarmları göster
-            _showAlertsDialog(context);
-          },
+          onPressed: () => _showAlertsDialog(context),
         ),
       ],
     );
@@ -162,14 +162,12 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // Top row with coin image and basic info
             Row(
               children: [
-                // Coin image
                 Hero(
-                  tag: 'crypto-${widget.crypto.id}',
+                  tag: 'crypto-${_crypto.id}',
                   child: CachedNetworkImage(
-                    imageUrl: widget.crypto.image,
+                    imageUrl: _crypto.image,
                     width: 60,
                     height: 60,
                     placeholder: (context, url) =>
@@ -182,21 +180,19 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                   ),
                 ),
                 const SizedBox(width: 16),
-
-                // Symbol and name
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.crypto.symbol.toUpperCase(),
+                        _crypto.symbol.toUpperCase(),
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
-                        widget.crypto.name,
+                        _crypto.name,
                         style: TextStyle(
                           fontSize: 16,
                           color: theme.textTheme.bodyMedium?.color
@@ -208,13 +204,9 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                 ),
               ],
             ),
-
             const Divider(height: 32),
-
-            // Price section
             Row(
               children: [
-                // Current price
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -228,7 +220,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '\$${_formatPrice(widget.crypto.currentPrice)}',
+                        '\$${_formatPrice(_crypto.currentPrice)}',
                         style: const TextStyle(
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
@@ -237,8 +229,6 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     ],
                   ),
                 ),
-
-                // 24h change
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -257,7 +247,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${isPositive ? '+' : ''}${widget.crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                        '${isPositive ? '+' : ''}${_crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
                         style: TextStyle(
                           color: isPositive ? Colors.green : Colors.red,
                           fontWeight: FontWeight.bold,
@@ -299,7 +289,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
             ),
             const SizedBox(height: 16),
             TradingViewChart(
-              symbol: widget.crypto.symbol,
+              symbol: _crypto.symbol,
               theme: 'dark',
             ),
           ],
@@ -327,26 +317,30 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                if (_priceAlerts.isNotEmpty)
-                  TextButton(
-                    onPressed: () => _showAlertsDialog(context),
-                    child: Text(
-                      'Available Alerts (${_priceAlerts.length})',
-                      style: TextStyle(
-                        color: theme.primaryColor,
-                      ),
-                    ),
-                  ),
+                StreamBuilder<List<PriceAlert>>(
+                  stream: _priceAlertsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                      return TextButton(
+                        onPressed: () => _showAlertsDialog(context),
+                        child: Text(
+                          'Available Alerts (${snapshot.data!.length})',
+                          style: TextStyle(
+                            color: theme.primaryColor,
+                          ),
+                        ),
+                      );
+                    }
+                    return const SizedBox();
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 16),
-            // Aşağıdaki Row'u esnek bir yapıya dönüştürüyoruz
             Column(
               children: [
-                // İlk olarak dropdown seçeneği
                 _buildAlertTypeDropdown(),
                 const SizedBox(height: 16),
-                // Ardından fiyat giriş alanı
                 TextField(
                   controller: _priceAlertController,
                   keyboardType: TextInputType.number,
@@ -389,9 +383,6 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       ),
     );
   }
-
-  // Alert type için dropdown widget (above/below)
-  String _selectedAlertType = 'above'; // Varsayılan değer
 
   Widget _buildAlertTypeDropdown() {
     return Container(
@@ -436,8 +427,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     );
   }
 
-  void _addPriceAlert() {
-    // Fiyat değerini kontrol et
+  Future<void> _addPriceAlert() async {
     double? alertPrice = double.tryParse(_priceAlertController.text);
 
     if (alertPrice == null) {
@@ -445,94 +435,113 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       return;
     }
 
-    // Mevcut fiyatla karşılaştır
-    double currentPrice = widget.crypto.currentPrice;
+    double currentPrice = _crypto.currentPrice;
 
-    // "above" seçildiyse ve hedef fiyat mevcut fiyattan düşükse uyarı ver
     if (_selectedAlertType == 'above' && alertPrice <= currentPrice) {
       _showErrorSnackBar('Target price must be higher than current price');
       return;
     }
 
-    // "below" seçildiyse ve hedef fiyat mevcut fiyattan yüksekse uyarı ver
     if (_selectedAlertType == 'below' && alertPrice >= currentPrice) {
       _showErrorSnackBar('Target price must be lower than current price');
       return;
     }
 
-    // Yeni alarm ekle
     final newAlert = PriceAlert(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      cryptoId: widget.crypto.id,
-      cryptoSymbol: widget.crypto.symbol,
+      cryptoId: _crypto.id,
+      cryptoSymbol: _crypto.symbol,
       targetPrice: alertPrice,
       isAbove: _selectedAlertType == 'above',
       createdAt: DateTime.now(),
     );
 
-    setState(() {
-      _priceAlerts.add(newAlert);
-    });
-
-    // Başarılı mesajı göster
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '${widget.crypto.symbol.toUpperCase()} for ${_selectedAlertType == 'above' ? 'above' : 'below'} alarm set: \$${_formatPrice(alertPrice)}',
+    try {
+      await _priceAlertService.addAlert(newAlert);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${_crypto.symbol.toUpperCase()} for ${_selectedAlertType == 'above' ? 'above' : 'below'} alarm set: \$${_formatPrice(alertPrice)}',
+          ),
+          backgroundColor: Colors.green,
         ),
-        backgroundColor: Colors.green,
-      ),
-    );
-
-    // Burada gerçek bir uygulamada, bu alarmı bir veritabanına kaydedersiniz
-    // ve bir bildirim servisine bağlarsınız
+      );
+    } catch (e) {
+      _showErrorSnackBar('Failed to save alert: $e');
+    }
   }
 
   void _showAlertsDialog(BuildContext context) {
+    // Dialog için yeni bir stream oluştur
+    final alertsStream = _priceAlertService.getAlertsForCrypto(_crypto.id);
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Price Alerts'),
         content: SizedBox(
           width: double.maxFinite,
-          child: _priceAlerts.isEmpty
-              ? const Center(
-                  child: Text('No alerts set yet'),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: _priceAlerts.length,
-                  itemBuilder: (context, index) {
-                    final alert = _priceAlerts[index];
-                    return ListTile(
-                      leading: Icon(
-                        alert.isAbove
-                            ? Icons.arrow_upward
-                            : Icons.arrow_downward,
-                        color: alert.isAbove ? Colors.green : Colors.red,
-                      ),
-                      title: Text(
-                        '${widget.crypto.symbol.toUpperCase()} ${alert.isAbove ? 'when above' : 'when below'}',
-                      ),
-                      subtitle: Text('\$${_formatPrice(alert.targetPrice)}'),
-                      trailing: IconButton(
-                        icon:
-                            const Icon(Icons.delete_outline, color: Colors.red),
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          setState(() {
-                            _priceAlerts.removeAt(index);
-                          });
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Alert removed'),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
+          height: 300, // Sabit bir yükseklik ver
+          child: StreamBuilder<List<PriceAlert>>(
+            stream: alertsStream,
+            builder: (context, snapshot) {
+              // Debug mesajları
+              debugPrint(
+                  'Dialog StreamBuilder state: ${snapshot.connectionState}');
+              debugPrint('Dialog StreamBuilder hasData: ${snapshot.hasData}');
+              debugPrint('Dialog StreamBuilder hasError: ${snapshot.hasError}');
+
+              if (snapshot.hasError) {
+                return Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error, color: Colors.red, size: 48),
+                    const SizedBox(height: 16),
+                    Text('Error: ${snapshot.error}'),
+                  ],
+                );
+              }
+
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Loading alerts...'),
+                    ],
+                  ),
+                );
+              }
+
+              final alerts = snapshot.data ?? [];
+              if (alerts.isEmpty) {
+                return const Center(child: Text('No alerts set yet'));
+              }
+
+              return ListView.builder(
+                itemCount: alerts.length,
+                itemBuilder: (context, index) {
+                  final alert = alerts[index];
+                  return ListTile(
+                    leading: Icon(
+                      alert.isAbove ? Icons.arrow_upward : Icons.arrow_downward,
+                      color: alert.isAbove ? Colors.green : Colors.red,
+                    ),
+                    title: Text(
+                      '${alert.cryptoSymbol.toUpperCase()} ${alert.isAbove ? 'when above' : 'when below'}',
+                    ),
+                    subtitle: Text('\$${_formatPrice(alert.targetPrice)}'),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      onPressed: () => _removeAlert(alert.id),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
         ),
         actions: [
           TextButton(
@@ -603,8 +612,6 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Stats grid
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
@@ -614,21 +621,18 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
               crossAxisSpacing: 16,
               children: [
                 _buildStatItem('Market Cap',
-                    '\$${_formatNumber(widget.crypto.marketCap)}', theme),
+                    '\$${_formatNumber(_crypto.marketCap)}', theme),
                 _buildStatItem('24H Volume',
-                    '\$${_formatNumber(widget.crypto.totalVolume)}', theme),
-                _buildStatItem('All-Time High',
-                    '\$${_formatPrice(widget.crypto.ath)}', theme),
-                _buildStatItem('All-Time Low',
-                    '\$${_formatPrice(widget.crypto.atl)}', theme),
+                    '\$${_formatNumber(_crypto.totalVolume)}', theme),
+                _buildStatItem(
+                    'All-Time High', '\$${_formatPrice(_crypto.ath)}', theme),
+                _buildStatItem(
+                    'All-Time Low', '\$${_formatPrice(_crypto.atl)}', theme),
               ],
             ),
-
             const SizedBox(height: 16),
             const Divider(),
             const SizedBox(height: 16),
-
-            // Supply details
             _buildSupplySection()
           ],
         ),
@@ -669,8 +673,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
 
   Widget _buildSupplySection() {
     final circulating = widget.crypto.circulatingSupply;
-    final total = widget.crypto
-        .totalVolume; // Fallback if null ** Burada supply yerine total volume var doğru mu bilemiyorum.
+    // Burada totalVolume yerine totalSupply kullanılmış olmalı
+    final total = widget.crypto.totalVolume; // totalVolume değil
     final percentCirculating = (circulating / total * 100).clamp(0, 100);
 
     return Column(
@@ -696,7 +700,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   Text(
-                    '${_formatNumber(circulating)} ${widget.crypto.symbol.toUpperCase()}',
+                    '${_formatNumber(circulating)} ${_crypto.symbol.toUpperCase()}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ],
@@ -755,6 +759,20 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
           .replaceAll(RegExp(r'\.$'), '');
     } else {
       return price.toStringAsFixed(0);
+    }
+  }
+
+  Future<void> _removeAlert(String alertId) async {
+    try {
+      await _priceAlertService.removeAlert(alertId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Alert removed successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      _showErrorSnackBar('Failed to remove alert: $e');
     }
   }
 
