@@ -13,14 +13,14 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 2;
   final PageController _pageController = PageController();
 
   // Screens'i önbelleğe al
   final List<Widget> _screens = const [
-    HomeScreen(),
     MarketScreen(),
     VideosScreen(),
+    HomeScreen(),
     CommunityScreen(),
     ProfileScreen(),
   ];
@@ -65,30 +65,54 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       backgroundColor: isDarkMode ? Colors.black : Colors.white,
       elevation: 0,
       labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'News',
-        ),
-        NavigationDestination(
+      indicatorColor: Theme.of(context)
+          .primaryColor
+          .withOpacity(0.2), // Seçili tab için arkaplan rengi
+
+      destinations: [
+        const NavigationDestination(
           icon: Icon(Icons.show_chart_outlined),
-          selectedIcon: Icon(Icons.show_chart),
+          selectedIcon: Icon(
+            Icons.show_chart,
+            color: Colors.white,
+            size: 35,
+          ),
           label: 'Market',
         ),
-        NavigationDestination(
+        const NavigationDestination(
           icon: Icon(Icons.video_library_outlined),
-          selectedIcon: Icon(Icons.video_library_rounded),
+          selectedIcon: Icon(
+            Icons.video_library_rounded,
+            color: Colors.white,
+            size: 35,
+          ),
           label: 'Videos',
         ),
-        NavigationDestination(
+        const NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(
+            Icons.home,
+            color: Colors.white,
+            size: 35,
+          ),
+          label: 'News',
+        ),
+        const NavigationDestination(
           icon: Icon(Icons.group_outlined),
-          selectedIcon: Icon(Icons.group),
+          selectedIcon: Icon(
+            Icons.group,
+            color: Colors.white,
+            size: 35,
+          ),
           label: 'Community',
         ),
-        NavigationDestination(
+        const NavigationDestination(
           icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
+          selectedIcon: Icon(
+            Icons.person,
+            color: Colors.white,
+            size: 35,
+          ),
           label: 'Profile',
         ),
       ],
