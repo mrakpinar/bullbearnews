@@ -14,7 +14,14 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _selectedIndex = 2;
-  final PageController _pageController = PageController();
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    // PageController'ı Home ekranı ile başlatın
+    _pageController = PageController(initialPage: _selectedIndex);
+  }
 
   // Screens'i önbelleğe al
   final List<Widget> _screens = const [

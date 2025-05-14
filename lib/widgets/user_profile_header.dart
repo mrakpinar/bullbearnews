@@ -1,19 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserProfileHeader extends StatelessWidget {
   final User? user;
   final VoidCallback? onImageUpload;
   final String? profileImageUrl;
 
-  const UserProfileHeader(
-      {super.key,
-      required this.user,
-      this.onImageUpload,
-      this.profileImageUrl});
+  const UserProfileHeader({
+    super.key,
+    required this.user,
+    this.onImageUpload,
+    this.profileImageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (user == null) {
+      return _buildHeader(context, 0, 0);
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user!.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return _buildHeader(context, 0, 0);
+        }
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>;
+        final followers = (userData['followers'] as List? ?? []).length;
+        final following = (userData['following'] as List? ?? []).length;
+
+        return _buildHeader(context, followers, following);
+      },
+    );
+  }
+
+  Widget _buildHeader(BuildContext context, int followers, int following) {
     return Center(
       child: Column(
         children: [
@@ -61,17 +87,48 @@ class UserProfileHeader extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 13),
           Text(
             user?.displayName ?? 'User',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 24,
+                ),
           ),
-          Text(
-            'Email: ${user?.email ?? 'Not available'}',
-            style: Theme.of(context).textTheme.bodyMedium,
+          const SizedBox(height: 4),
+          Text(user?.email ?? 'Not available'),
+          const SizedBox(height: 24),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildCountInfo(context, 'Followers', followers),
+              const SizedBox(width: 24),
+              _buildCountInfo(context, 'Following', following),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCountInfo(BuildContext context, String label, int count) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          count.toString(),
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.grey,
+              ),
+        ),
+      ],
     );
   }
 }

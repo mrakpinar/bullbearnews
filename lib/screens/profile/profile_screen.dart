@@ -6,6 +6,7 @@ import 'package:bullbearnews/widgets/portfolio_pie_chart.dart';
 import 'package:bullbearnews/widgets/saved_news_list.dart';
 import 'package:bullbearnews/widgets/user_profile_header.dart';
 import 'package:bullbearnews/widgets/wallet_summary_card.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -49,10 +50,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfileImage() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _profileImageUrl = prefs.getString('profileImageUrl');
-    });
+    const defaultImageUrl =
+        "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        String? imageUrl;
+        if (userDoc.exists &&
+            userDoc.data()!.containsKey('profileImageUrl') &&
+            userDoc.data()!['profileImageUrl'] != null &&
+            userDoc.data()!['profileImageUrl'].toString().trim().isNotEmpty) {
+          imageUrl = userDoc.data()!['profileImageUrl'];
+        }
+
+        if (imageUrl == null || imageUrl.isEmpty) {
+          // Firestore'da geçerli bir profil resmi yoksa SharedPreferences'a bak
+          final prefs = await SharedPreferences.getInstance();
+          final savedImageUrl = prefs.getString('profileImageUrl');
+          if (savedImageUrl != null && savedImageUrl.trim().isNotEmpty) {
+            imageUrl = savedImageUrl;
+            // Firestore'a da kaydet
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .update({'profileImageUrl': savedImageUrl});
+          }
+        }
+
+        // Eğer hala bir görsel bulunamadıysa, varsayılan resmi kullan
+        setState(() {
+          _profileImageUrl = (imageUrl != null && imageUrl.trim().isNotEmpty)
+              ? imageUrl
+              : defaultImageUrl;
+        });
+      } else {
+        // Kullanıcı oturum açmamışsa varsayılan resmi göster
+        setState(() {
+          _profileImageUrl = defaultImageUrl;
+        });
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+      // Hata durumunda da varsayılan resmi göster
+      setState(() {
+        _profileImageUrl = defaultImageUrl;
+      });
+    }
   }
 
   Future<void> _uploadProfileImage() async {
@@ -82,7 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final response = await cloudinary.uploadFile(
           CloudinaryFile.fromFile(
             pickedFile.path,
-            folder: 'profile_images', // Optional folder in Cloudinary
+            folder: 'profile_images',
             publicId: 'profile_${FirebaseAuth.instance.currentUser!.uid}',
           ),
         );
@@ -91,8 +140,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('profileImageUrl', response.secureUrl);
 
-        // Update user's profile in Firebase
-        await _authService.updateProfileImage(response.secureUrl);
+        // Update user's profile in Firebase Firestore
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .update({'profileImageUrl': response.secureUrl});
+        }
 
         // Update local state
         setState(() {

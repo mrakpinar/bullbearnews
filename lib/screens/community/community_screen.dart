@@ -48,7 +48,13 @@ class _CommunityScreenState extends State<CommunityScreen>
           indicatorColor: Colors.purple,
           labelColor: Colors.purple,
           unselectedLabelColor: Colors.grey,
-          isScrollable: true,
+          // isScrollable: true, // Bu satırı kaldırabilirsiniz (sabit genişlik için)
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 16.0),
+          indicator: UnderlineTabIndicator(
+            borderSide: BorderSide(width: 3.0, color: Colors.purple),
+            insets: EdgeInsets.symmetric(horizontal: 16.0),
+          ),
           tabs: const [
             Tab(icon: Icon(Icons.forum_outlined), text: 'Chat Rooms'),
             Tab(icon: Icon(Icons.poll_outlined), text: 'Polls'),

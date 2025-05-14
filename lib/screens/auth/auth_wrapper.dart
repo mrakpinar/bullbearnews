@@ -6,8 +6,9 @@ import 'auth_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   final AuthService _authService = AuthService();
+  final bool showOfflineBanner;
 
-  AuthWrapper({super.key});
+  AuthWrapper({super.key, this.showOfflineBanner = false});
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +28,27 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.hasData && snapshot.data != null) {
           return MainNavigationScreen();
         } else {
-          return AuthScreen();
+          return Stack(
+            children: [
+              AuthScreen(),
+              // Offline banner
+              if (showOfflineBanner)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    color: Colors.red,
+                    child: const Text(
+                      'Offline Mode',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          );
         }
       },
     );

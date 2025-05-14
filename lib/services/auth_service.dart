@@ -41,6 +41,9 @@ class AuthService {
         'nickname': nickname,
         'createdAt': DateTime.now(),
         'favoriteNews': [],
+        'followers': [],
+        'following': [],
+        'profileImageUrl': '',
       });
 
       // Kullanıcı profilini güncelle
@@ -106,5 +109,36 @@ class AuthService {
       print('Profil resmi güncelleme hatası: $e');
       rethrow;
     }
+  }
+
+  // Kullanıcıyı takip et
+  Future<void> followUser(String targetUserId) async {
+    final currentUserId = _auth.currentUser!.uid;
+
+    await _firestore.collection('users').doc(currentUserId).update({
+      'following': FieldValue.arrayUnion([targetUserId]),
+    });
+
+    await _firestore.collection('users').doc(targetUserId).update({
+      'followers': FieldValue.arrayUnion([currentUserId]),
+    });
+  }
+
+// Takibi bırak
+  Future<void> unfollowUser(String targetUserId) async {
+    final currentUserId = _auth.currentUser!.uid;
+
+    await _firestore.collection('users').doc(currentUserId).update({
+      'following': FieldValue.arrayRemove([targetUserId]),
+    });
+
+    await _firestore.collection('users').doc(targetUserId).update({
+      'followers': FieldValue.arrayRemove([currentUserId]),
+    });
+  }
+
+// Kullanıcı bilgilerini getir
+  Future<DocumentSnapshot> getUserInfo(String userId) {
+    return _firestore.collection('users').doc(userId).get();
   }
 }

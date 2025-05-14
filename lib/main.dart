@@ -1,9 +1,12 @@
+import 'package:bullbearnews/connectivity_service.dart';
 import 'package:bullbearnews/models/news_model.dart';
 import 'package:bullbearnews/services/local_storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'firebase_options.dart';
 import 'screens/auth/auth_wrapper.dart';
 import 'providers/theme_provider.dart';
@@ -15,8 +18,10 @@ Future<void> main() async {
   await _initializeApp();
 
   runApp(
-    ChangeNotifierProvider(
-      create: (context) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => ThemeProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -31,7 +36,6 @@ Future<void> _initializeApp() async {
     await LocalStorageService.init();
   } catch (e) {
     print('Initialization error: $e');
-    // Hata durumunda box'ı temizle ve yeniden dene
     try {
       await Hive.deleteBoxFromDisk('savedNews');
       await LocalStorageService.init();
@@ -41,8 +45,45 @@ Future<void> _initializeApp() async {
   }
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isOnline = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkConnection();
+    ConnectivityService.connectivityStream.listen((result) {
+      // ignore: unrelated_type_equality_checks
+      _updateConnectionStatus(result != ConnectivityResult.none);
+    });
+  }
+
+  Future<void> _checkConnection() async {
+    final isConnected = await ConnectivityService.isConnected();
+    _updateConnectionStatus(isConnected);
+  }
+
+  void _updateConnectionStatus(bool isOnline) {
+    if (mounted) {
+      setState(() => _isOnline = isOnline);
+      if (!isOnline) {
+        Fluttertoast.showToast(
+          msg: "You are offline. Some features may not be available.",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.red,
+          textColor: Colors.white,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +95,7 @@ class MyApp extends StatelessWidget {
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: themeProvider.themeMode,
-      home: AuthWrapper(),
+      home: AuthWrapper(showOfflineBanner: !_isOnline),
     );
   }
 
@@ -66,6 +107,7 @@ class MyApp extends StatelessWidget {
         primary: Colors.purple[300]!,
         secondary: Colors.purpleAccent[100]!,
         background: Colors.grey[100]!,
+        primaryContainer: Colors.grey[400]!,
       ),
     );
   }
@@ -78,6 +120,7 @@ class MyApp extends StatelessWidget {
         primary: Colors.purple[800]!,
         secondary: Colors.purpleAccent[700]!,
         background: Colors.grey[900]!,
+        primaryContainer: Colors.grey[800]!,
       ),
     );
   }

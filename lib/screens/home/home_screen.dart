@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/home/search_user_screen.dart';
 import 'package:bullbearnews/widgets/news_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -66,6 +67,15 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => SearchUserScreen()),
+              );
+            },
+          ),
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list),
             onSelected: (String category) {
