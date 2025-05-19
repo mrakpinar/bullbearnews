@@ -17,8 +17,15 @@ class _NewsCardState extends State<NewsCard> {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       margin: EdgeInsets.only(bottom: 16),
+      padding: EdgeInsets.all(0),
       decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        border: Border.all(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          width: 0.5,
+        ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -31,8 +38,15 @@ class _NewsCardState extends State<NewsCard> {
       child: InkWell(
         onTap: () => _navigateToDetail(),
         borderRadius: BorderRadius.circular(16),
+        highlightColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+        splashColor: Theme.of(context).colorScheme.primary.withOpacity(0.1),
         child: Container(
+          width: double.infinity,
           decoration: BoxDecoration(
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              width: 0.5,
+            ),
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(16),
           ),
@@ -41,6 +55,7 @@ class _NewsCardState extends State<NewsCard> {
             children: [
               // Haber resmi
               ClipRRect(
+                clipBehavior: Clip.antiAlias,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
                 child: CachedNetworkImage(
                   imageUrl: widget.news.imageUrl,
@@ -57,8 +72,17 @@ class _NewsCardState extends State<NewsCard> {
                     color: Colors.grey[300],
                     child: Icon(Icons.image, color: Colors.grey[600], size: 48),
                   ),
+                  fadeInDuration: Duration(milliseconds: 300),
+                  fadeOutDuration: Duration(milliseconds: 300),
+                  fadeInCurve: Curves.easeIn,
+                  fadeOutCurve: Curves.easeOut,
+                  alignment: Alignment.center,
+                  filterQuality: FilterQuality.high,
+                  colorBlendMode: BlendMode.darken,
+                  color: Colors.black.withOpacity(0.2),
                 ),
               ),
+              SizedBox(height: 8),
 
               // Haber içeriği
               Padding(
@@ -68,6 +92,7 @@ class _NewsCardState extends State<NewsCard> {
                   children: [
                     // Kategori ve tarih
                     Row(
+                      mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
@@ -77,23 +102,30 @@ class _NewsCardState extends State<NewsCard> {
                           ),
                           decoration: BoxDecoration(
                             color:
-                                Theme.of(context).colorScheme.primaryContainer,
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[200],
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
                             widget.news.category,
                             style: TextStyle(
-                              color: Colors.white,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black,
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                             ),
                           ),
                         ),
+                        SizedBox(width: 8),
                         Text(
                           _formatDate(widget.news.publishDate),
                           style: TextStyle(
                             color: Colors.grey[600],
                             fontSize: 12,
+                            fontWeight: FontWeight.w400,
                           ),
                         ),
                       ],
@@ -107,6 +139,12 @@ class _NewsCardState extends State<NewsCard> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
+                        height: 1.2,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
+                        letterSpacing: 2,
+                        wordSpacing: 2,
                       ),
                     ),
 
@@ -119,23 +157,31 @@ class _NewsCardState extends State<NewsCard> {
                         color: Colors.grey[700],
                         fontSize: 14,
                         height: 1.4,
+                        fontWeight: FontWeight.w400,
                       ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.justify,
                     ),
 
                     SizedBox(height: 12),
 
                     // Yazar ve okuma butonu
                     Row(
+                      mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             Icon(
                               Icons.person,
                               size: 16,
-                              color: Colors.grey[600],
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black,
                             ),
                             SizedBox(width: 4),
                             Text(widget.news.author),
@@ -192,7 +238,10 @@ class _NewsCardState extends State<NewsCard> {
       builder: (context, snapshot) {
         final isSaved = snapshot.data ?? false;
         return IconButton(
-          icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border),
+          icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black),
           onPressed: _toggleSave,
         );
       },

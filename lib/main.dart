@@ -102,7 +102,7 @@ class _MyAppState extends State<MyApp> {
   ThemeData _buildLightTheme() {
     return ThemeData(
       brightness: Brightness.light,
-      scaffoldBackgroundColor: Colors.grey[100],
+      scaffoldBackgroundColor: Colors.grey[400],
       colorScheme: ColorScheme.light(
         primary: Colors.purple[300]!,
         secondary: Colors.purpleAccent[100]!,

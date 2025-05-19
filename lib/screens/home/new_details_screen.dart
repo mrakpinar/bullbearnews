@@ -43,7 +43,9 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Arka plan rengi siyah
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.background
+          : Colors.grey[100],
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : _news == null
@@ -104,7 +106,11 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                               style: TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white, // Başlık rengi beyaz
+                                height: 1.2,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black, // Başlık rengi
                               ),
                             ),
                             SizedBox(height: 16),
@@ -130,12 +136,19 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                 ),
                                 SizedBox(width: 16),
                                 Icon(Icons.access_time,
-                                    size: 16, color: Colors.grey),
+                                    size: 16,
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black), // Tarih simgesi
                                 SizedBox(width: 4),
                                 Text(
                                   _formatDate(_news!.publishDate),
                                   style: TextStyle(
-                                    color: Colors.grey[400], // Tarih rengi gri
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? Colors.white
+                                        : Colors.black, // Tarih rengi
                                   ),
                                 ),
                               ],
@@ -145,8 +158,12 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                               _news!.content,
                               style: TextStyle(
                                 fontSize: 16,
+                                fontWeight: FontWeight.normal,
                                 height: 1.6,
-                                color: Colors.white, // İçerik rengi beyaz
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.white
+                                    : Colors.black, // İçerik rengi
                               ),
                             ),
                             SizedBox(height: 32),
@@ -164,22 +181,34 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                 ),
                                 SizedBox(width: 12),
                                 Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(
                                       'Author',
                                       style: TextStyle(
                                         fontSize: 12,
-                                        color: Colors.grey[
-                                            400], // Yazar etiketi rengi gri
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.2,
+                                        color: Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white
+                                            : Colors
+                                                .black, // Yazar etiketi rengi
                                       ),
                                     ),
                                     Text(
                                       _news!.author,
                                       style: TextStyle(
+                                        fontSize: 16,
+                                        height: 1.2,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors
-                                            .white, // Yazar adı rengi beyaz
+
+                                        color: Theme.of(context).brightness ==
+                                                Brightness.dark
+                                            ? Colors.white
+                                            : Colors.black, // Yazar adı rengi
                                       ),
                                     ),
                                   ],

@@ -56,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Theme.of(context).brightness == Brightness.dark
+          ? Theme.of(context).colorScheme.background
+          : Colors.grey[400],
       appBar: AppBar(
         title: Text(
           'BBN',
@@ -68,7 +71,14 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: Icon(Icons.search),
+            icon: Icon(
+              Icons.search,
+              size: 30,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
+            tooltip: 'Search',
             onPressed: () {
               Navigator.push(
                 context,
@@ -77,7 +87,13 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.filter_list),
+            icon: Icon(
+              Icons.filter_list,
+              size: 30,
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white
+                  : Colors.black,
+            ),
             onSelected: (String category) {
               setState(() {
                 _selectedCategory = category;
@@ -96,8 +112,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              strokeWidth: 2,
+            ))
           : RefreshIndicator(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              backgroundColor: Theme.of(context).colorScheme.background,
               onRefresh: _loadNews,
               child: ListView.builder(
                 padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
