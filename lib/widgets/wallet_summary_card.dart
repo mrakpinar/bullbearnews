@@ -7,6 +7,7 @@ class WalletSummaryCard extends StatelessWidget {
   final double totalProfitLossPercentage;
   final VoidCallback onAddToWallet;
   final VoidCallback onShowDetails;
+  final Future<void> Function()? refreshCallback;
 
   const WalletSummaryCard({
     super.key,
@@ -16,6 +17,7 @@ class WalletSummaryCard extends StatelessWidget {
     required this.totalProfitLossPercentage,
     required this.onAddToWallet,
     required this.onShowDetails,
+    this.refreshCallback,
   });
 
   String _formatNumber(double number) {
@@ -33,50 +35,126 @@ class WalletSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final hasData = totalPortfolioValue > 0;
+    bool isRefreshing = false;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'My Wallet',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: onAddToWallet,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
         Card(
-          child: InkWell(
-            onTap: onShowDetails,
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Text(
-                    'Portfolio Value',
+          elevation: 2,
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Portfolio Summary',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    if (hasData)
+                      StatefulBuilder(
+                        // Refresh durumunu güncellemek için
+                        builder: (context, setState) {
+                          return IconButton(
+                            icon: isRefreshing
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.refresh),
+                            onPressed: () async {
+                              if (refreshCallback != null) {
+                                setState(() => isRefreshing = true);
+                                try {
+                                  await refreshCallback!();
+                                } finally {
+                                  setState(() => isRefreshing = false);
+                                }
+                              }
+                            },
+                          );
+                        },
+                      )
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Total Value',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                    Text(
+                      '\$${totalPortfolioValue.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: isDarkMode ? Colors.amber : Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (hasData) _buildPortfolioSummaryDetails(isDarkMode),
+                if (!hasData)
+                  Center(
+                    child: Text(
+                      'No assets in portfolio',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 36),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isDarkMode ? Colors.amber : Colors.blue,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 20,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    shadowColor: isDarkMode
+                        ? Colors.amber.withOpacity(0.5)
+                        : Theme.of(context).primaryColor.withOpacity(0.5),
+                    elevation: 4,
+                  ),
+                  onPressed: onAddToWallet,
+                  child: Text(
+                    'Add Asset',
                     style: TextStyle(
                       fontSize: 16,
-                      color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    '\$${_formatNumber(totalPortfolioValue)}',
-                    style: const TextStyle(
-                      fontSize: 24,
                       fontWeight: FontWeight.bold,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.white,
+                      decoration: TextDecoration.none,
+                      decorationColor: Colors.transparent,
+                      decorationStyle: TextDecorationStyle.solid,
+                      decorationThickness: 0,
+                      shadows: [
+                        Shadow(
+                          color: isDarkMode
+                              ? Colors.amber.withOpacity(0.5)
+                              : Theme.of(context).primaryColor.withOpacity(0.5),
+                          offset: const Offset(2, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  _buildPortfolioSummaryDetails(isDarkMode),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -91,20 +169,36 @@ class WalletSummaryCard extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Invested',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-              ),
+            Row(
+              children: [
+                const SizedBox(height: 4),
+                const Icon(
+                  Icons.arrow_right,
+                  size: 16,
+                ),
+                Text(
+                  'Invested',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
-            Text(
-              '\$${_formatNumber(totalInvestment)}',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const SizedBox(width: 6),
+                Text(
+                  '\$${_formatNumber(totalInvestment)}',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
+            const SizedBox(height: 4),
           ],
         ),
         Column(
@@ -118,6 +212,7 @@ class WalletSummaryCard extends StatelessWidget {
               ),
             ),
             Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 Icon(
                   totalProfitLoss >= 0
@@ -132,6 +227,7 @@ class WalletSummaryCard extends StatelessWidget {
                   style: TextStyle(
                     color: totalProfitLoss >= 0 ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
                 ),
               ],

@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/crypto_model.dart';
@@ -109,11 +110,18 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
           children: [
             Text(
               'My Favorite Cryptos',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black,
+                    fontSize: 20,
+                  ),
             ),
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: widget.onRefresh,
+              tooltip: 'Refresh',
+              color: isDarkMode ? Colors.white : Colors.black,
+              iconSize: 24,
             ),
           ],
         ),
@@ -145,6 +153,7 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                 style: TextStyle(
                   color: Colors.grey,
                   fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -169,6 +178,15 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
               crypto.image,
               height: 40,
               width: 40,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const SizedBox(
+                  height: 40,
+                  width: 40,
+                  child: Center(child: CircularProgressIndicator()),
+                );
+              },
               errorBuilder: (context, error, stackTrace) {
                 return const Icon(Icons.currency_bitcoin, size: 40);
               },
@@ -177,7 +195,10 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
               children: [
                 Text(
                   crypto.name,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -185,6 +206,7 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                   style: TextStyle(
                     color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                     fontSize: 12,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -194,12 +216,14 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
               style: TextStyle(
                 fontSize: 12,
                 color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
             ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Column(
+                  mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -211,6 +235,8 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                       ),
                     ),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
@@ -220,11 +246,14 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                           color: isPositive ? Colors.green : Colors.red,
                           size: 16,
                         ),
+                        const SizedBox(width: 4),
+                        // Price change percentage
                         Text(
                           '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
                           style: TextStyle(
                             color: isPositive ? Colors.green : Colors.red,
                             fontSize: 14,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ],
@@ -233,11 +262,25 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
+                  tooltip: 'Remove from favorites',
+                  padding: const EdgeInsets.all(0),
+                  constraints: const BoxConstraints(),
+                  iconSize: 24,
+                  color: isDarkMode ? Colors.white : Colors.black,
                   icon: const Icon(Icons.star, color: Colors.amber),
                   onPressed: () => _showRemoveFavoriteDialog(crypto),
                 ),
               ],
             ),
+            onLongPress: () => _showRemoveFavoriteDialog(crypto),
+            onTap: () {
+              // Navigate to crypto details page
+              Navigator.push(context, MaterialPageRoute(builder: (context) {
+                return CryptoDetailScreen(
+                  crypto: crypto,
+                );
+              }));
+            },
           ),
         );
       },

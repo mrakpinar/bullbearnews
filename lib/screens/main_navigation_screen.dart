@@ -13,7 +13,7 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _selectedIndex = 2;
+  int _selectedIndex = 4;
   late final PageController _pageController;
 
   @override

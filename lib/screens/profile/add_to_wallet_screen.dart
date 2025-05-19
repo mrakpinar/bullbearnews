@@ -1,23 +1,35 @@
-import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/crypto_model.dart';
 import '../../models/wallet_model.dart';
+import '../../services/crypto_service.dart';
 
 class AddToWalletScreen extends StatefulWidget {
-  final List<CryptoModel> cryptos;
-
-  const AddToWalletScreen({super.key, required this.cryptos});
+  const AddToWalletScreen({super.key});
 
   @override
   State<AddToWalletScreen> createState() => _AddToWalletScreenState();
 }
 
 class _AddToWalletScreenState extends State<AddToWalletScreen> {
+  final CryptoService _cryptoService = CryptoService();
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _buyPriceController = TextEditingController();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+
   CryptoModel? _selectedCrypto;
+  List<CryptoModel> _allCryptos = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCryptos();
+  }
 
   @override
   void dispose() {
@@ -26,33 +38,70 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
     super.dispose();
   }
 
+  Future<void> _loadCryptos() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final cryptos = await _cryptoService.getCryptoData();
+      setState(() {
+        _allCryptos = cryptos;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Failed to load cryptocurrencies: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add to Wallet'),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 24),
-              _buildCryptoDropdown(),
-              const SizedBox(height: 20),
-              _buildAmountField(),
-              const SizedBox(height: 20),
-              _buildBuyPriceField(),
-              const SizedBox(height: 32),
-              _buildAddButton(),
-            ],
+        title: Text(
+          'Add to Wallet',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
           ),
         ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_sharp, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _errorMessage.isNotEmpty
+              ? Center(child: Text(_errorMessage))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _buildHeader(),
+                        const SizedBox(height: 24),
+                        _buildCryptoDropdown(),
+                        const SizedBox(height: 20),
+                        _buildAmountField(),
+                        const SizedBox(height: 20),
+                        _buildBuyPriceField(),
+                        const SizedBox(height: 32),
+                        _buildAddButton(),
+                      ],
+                    ),
+                  ),
+                ),
     );
   }
 
@@ -74,61 +123,89 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
           style: TextStyle(fontWeight: FontWeight.w500),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Colors.grey.shade300),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: DropdownButtonFormField<CryptoModel>(
-            value: _selectedCrypto,
-            isExpanded: true,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
-              enabledBorder: InputBorder.none,
-              focusedBorder: InputBorder.none,
+        // Add a fixed height container to eliminate overflow
+        SizedBox(
+          height: 50, // Fixed height to contain the dropdown button
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
             ),
-            icon: const Icon(Icons.arrow_drop_down),
-            hint: const Text('Select a cryptocurrency'),
-            items: widget.cryptos.map((crypto) {
-              return DropdownMenuItem<CryptoModel>(
-                value: crypto,
-                child: Row(
-                  children: [
-                    _buildCryptoImage(crypto),
-                    const SizedBox(width: 12),
-                    _buildCryptoInfo(crypto),
-                  ],
+            child: Theme(
+              // Override the default dropdown theme locally
+              data: Theme.of(context).copyWith(
+                // Reduces the dropdown menu density
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<CryptoModel>(
+                  value: _selectedCrypto,
+                  isExpanded: true,
+                  icon: const Icon(Icons.arrow_drop_down),
+                  // Remove all padding
+                  padding: EdgeInsets.zero,
+                  // Align items to the start
+                  itemHeight: null, // Remove fixed item height
+                  // Add validator separately since we're using DropdownButton instead of DropdownButtonFormField
+                  hint: const Padding(
+                    padding: EdgeInsets.only(left: 12.0),
+                    child: Text('Select a cryptocurrency'),
+                  ),
+                  items: _allCryptos.map((crypto) {
+                    return DropdownMenuItem<CryptoModel>(
+                      value: crypto,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _buildCryptoImage(crypto),
+                            const SizedBox(width: 8),
+                            Expanded(child: _buildCryptoInfo(crypto)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCrypto = value;
+                      if (_selectedCrypto != null &&
+                          _buyPriceController.text.isEmpty) {
+                        _buyPriceController.text =
+                            _selectedCrypto!.currentPrice.toStringAsFixed(4);
+                      }
+                    });
+                  },
                 ),
-              );
-            }).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedCrypto = value;
-                if (_selectedCrypto != null &&
-                    _buyPriceController.text.isEmpty) {
-                  _buyPriceController.text =
-                      _selectedCrypto!.currentPrice.toStringAsFixed(4);
-                }
-              });
-            },
-            validator: (value) =>
-                value == null ? 'Please select a cryptocurrency' : null,
+              ),
+            ),
           ),
         ),
+        // Add validation message display
+        if (_selectedCrypto == null &&
+            _formKey.currentState?.validate() == false)
+          const Padding(
+            padding: EdgeInsets.only(top: 6.0, left: 12.0),
+            child: Text(
+              'Please select a cryptocurrency',
+              style: TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
       ],
     );
   }
 
   Widget _buildCryptoImage(CryptoModel crypto) {
     return Container(
-      width: 30,
-      height: 30,
+      width: 24, // Smaller size
+      height: 24, // Smaller size
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         image: DecorationImage(
           image: NetworkImage(crypto.image),
-          onError: (_, __) => const Icon(Icons.currency_bitcoin, size: 24),
+          onError: (_, __) =>
+              const Icon(Icons.currency_bitcoin, size: 18), // Smaller icon size
           fit: BoxFit.cover,
         ),
       ),
@@ -138,21 +215,22 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
   Widget _buildCryptoInfo(CryptoModel crypto) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min, // Keep column as small as possible
       children: [
-        SizedBox(
-          width: MediaQuery.of(context).size.width * 0.6,
-          child: Text(
-            crypto.name,
-            style: const TextStyle(fontSize: 14),
-            overflow: TextOverflow.ellipsis,
-          ),
+        // Use single line for crypto name and symbol to save space
+        Text(
+          crypto.name,
+          style: const TextStyle(fontSize: 13), // Slightly smaller font
+          overflow: TextOverflow.ellipsis,
+          maxLines: 1, // Force single line
         ),
         Text(
           crypto.symbol.toUpperCase(),
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 11, // Slightly smaller font
             color: Colors.grey.shade600,
           ),
+          maxLines: 1, // Force single line
         ),
       ],
     );
@@ -238,8 +316,8 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
     if (!_formKey.currentState!.validate() || _selectedCrypto == null) return;
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final walletItems = prefs.getStringList('walletItems') ?? [];
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
 
       final newItem = WalletItem(
         cryptoId: _selectedCrypto!.id,
@@ -250,8 +328,19 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
         buyPrice: double.parse(_buyPriceController.text),
       );
 
-      walletItems.add(json.encode(newItem.toJson()));
-      await prefs.setStringList('walletItems', walletItems);
+      // Wallet ID'sini doğru şekilde al
+      final walletId = ModalRoute.of(context)?.settings.arguments as String?;
+      if (walletId == null) throw Exception('Wallet ID not provided');
+
+      // Firestore'a ekleme işlemi
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .doc(walletId)
+          .update({
+        'items': FieldValue.arrayUnion([newItem.toJson()])
+      });
 
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -260,9 +349,6 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
           SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }

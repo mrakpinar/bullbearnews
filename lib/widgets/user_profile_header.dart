@@ -42,8 +42,40 @@ class UserProfileHeader extends StatelessWidget {
   Widget _buildHeader(BuildContext context, int followers, int following) {
     return Center(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          const SizedBox(height: 24),
           GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () {
+              // Show options to change profile picture
+              showDialog(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: const Text('Change Profile Picture'),
+                    content: const Text('Choose an option'),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          // Handle camera option
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Camera'),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Handle gallery option
+                          Navigator.of(context).pop();
+                        },
+                        child: const Text('Gallery'),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
             onTap: onImageUpload,
             child: Stack(
               children: [
@@ -51,7 +83,10 @@ class UserProfileHeader extends StatelessWidget {
                   radius: 50,
                   backgroundColor: Theme.of(context).colorScheme.primary,
                   backgroundImage: profileImageUrl != null
-                      ? NetworkImage(profileImageUrl!)
+                      ? NetworkImage(
+                          profileImageUrl!,
+                          scale: 1.0,
+                        )
                       : null,
                   child: profileImageUrl == null
                       ? Text(
@@ -60,27 +95,30 @@ class UserProfileHeader extends StatelessWidget {
                           style: const TextStyle(
                             fontSize: 40,
                             color: Colors.white,
+                            fontWeight: FontWeight.bold,
                           ),
                         )
                       : null,
                 ),
                 Positioned(
                   bottom: 0,
-                  right: 0,
+                  right: -10,
                   child: Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black26,
-                            blurRadius: 4,
-                          )
-                        ]),
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                     child: Icon(
-                      Icons.camera_alt,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 20,
+                      Icons.add_a_photo_sharp,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black,
+                      size: 24,
+                      semanticLabel: 'Change Profile Picture',
+                      textDirection: TextDirection.ltr,
                     ),
                   ),
                 )
@@ -96,7 +134,10 @@ class UserProfileHeader extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 4),
-          Text(user?.email ?? 'Not available'),
+          Text(user?.email ?? 'Not available',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey,
+                  )),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,

@@ -1,17 +1,17 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import '../../models/crypto_model.dart';
 import '../../models/wallet_model.dart';
 import '../../services/crypto_service.dart';
 
 class PortfolioDetailScreen extends StatefulWidget {
-  final List<WalletItem> walletItems;
+  final Wallet wallet;
   final Function() onUpdate;
 
   const PortfolioDetailScreen({
     super.key,
-    required this.walletItems,
+    required this.wallet,
     required this.onUpdate,
   });
 
@@ -20,15 +20,94 @@ class PortfolioDetailScreen extends StatefulWidget {
 }
 
 class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
+  late Wallet _wallet;
+
+  // Initialize with an empty list instead of using 'late'
+  List<WalletItem> _walletItems = [];
+
   final CryptoService _cryptoService = CryptoService();
-  late List<WalletItem> _walletItems;
   bool _isLoading = true;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
-    _walletItems = List.from(widget.walletItems);
+    _wallet = widget.wallet;
+
+    // Safely initialize wallet items from the wallet
+    _walletItems = List<WalletItem>.from(_wallet.items);
+
     _loadData();
+  }
+
+  Future<void> _updateItemAmount(int index, double newAmount) async {
+    if (newAmount <= 0) {
+      _showSnackbar('Amount must be greater than 0', isError: true);
+      return;
+    }
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      final item = _walletItems[index];
+
+      // Create updated items list
+      List<Map<String, dynamic>> updatedItems =
+          _walletItems.map((item) => item.toJson()).toList();
+      updatedItems[index]['amount'] = newAmount;
+
+      // Update the Firestore document with the complete items list
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .doc(_wallet.id)
+          .update({'items': updatedItems});
+
+      // Update local state
+      setState(() {
+        _walletItems[index] = item.copyWith(amount: newAmount);
+      });
+
+      widget.onUpdate();
+      _showSnackbar('Amount updated successfully');
+    } catch (e) {
+      _showSnackbar('Error updating amount: $e', isError: true);
+    }
+  }
+
+  Future<void> _removeItem(String cryptoId) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      // Remove the item from local state
+      final updatedItems =
+          _walletItems.where((item) => item.cryptoId != cryptoId).toList();
+
+      // Convert to JSON format for Firestore
+      final updatedItemsJson =
+          updatedItems.map((item) => item.toJson()).toList();
+
+      // Update the Firestore document with the updated items list
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .doc(_wallet.id)
+          .update({'items': updatedItemsJson});
+
+      setState(() {
+        _walletItems = updatedItems;
+      });
+
+      widget.onUpdate();
+      _showSnackbar('Item removed from portfolio');
+    } catch (e) {
+      _showSnackbar('Error removing item: $e', isError: true);
+    }
   }
 
   Future<void> _loadData() async {
@@ -39,47 +118,6 @@ class _PortfolioDetailScreenState extends State<PortfolioDetailScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       _showSnackbar('Error loading data: $e', isError: true);
-    }
-  }
-
-  Future<void> _updateItemAmount(int index, double newAmount) async {
-    if (newAmount <= 0) {
-      _showSnackbar('Amount must be greater than 0', isError: true);
-      return;
-    }
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _walletItems[index] = _walletItems[index].copyWith(amount: newAmount);
-
-      await prefs.setStringList(
-        'walletItems',
-        _walletItems.map((item) => json.encode(item.toJson())).toList(),
-      );
-
-      widget.onUpdate();
-      setState(() {});
-      _showSnackbar('Amount updated successfully');
-    } catch (e) {
-      _showSnackbar('Error updating amount: $e', isError: true);
-    }
-  }
-
-  Future<void> _removeItem(String cryptoId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      _walletItems.removeWhere((item) => item.cryptoId == cryptoId);
-
-      await prefs.setStringList(
-        'walletItems',
-        _walletItems.map((item) => json.encode(item.toJson())).toList(),
-      );
-
-      widget.onUpdate();
-      setState(() {});
-      _showSnackbar('Item removed from portfolio');
-    } catch (e) {
-      _showSnackbar('Error removing item: $e', isError: true);
     }
   }
 

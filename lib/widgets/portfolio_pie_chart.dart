@@ -16,6 +16,27 @@ class PortfolioPieChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Verileri hazırla
+    final totalValue = walletItems.fold<double>(0, (sum, item) {
+      final crypto = allCryptos.firstWhere(
+        (c) => c.id == item.cryptoId,
+        orElse: () => CryptoModel(
+          id: item.cryptoId,
+          name: item.cryptoName,
+          symbol: item.cryptoSymbol,
+          image: item.cryptoImage,
+          currentPrice: 0,
+          priceChangePercentage24h: 0,
+          marketCap: 0,
+          totalVolume: 0,
+          circulatingSupply: 0,
+          ath: 0,
+          atl: 0,
+        ),
+      );
+      return sum + (item.amount * crypto.currentPrice);
+    });
+
+    // Grafik verilerini hazırla
     final pieData = walletItems.map((item) {
       final crypto = allCryptos.firstWhere(
         (c) => c.id == item.cryptoId,
@@ -34,13 +55,15 @@ class PortfolioPieChart extends StatelessWidget {
         ),
       );
       final value = item.amount * crypto.currentPrice;
+      final percentage = totalValue > 0 ? (value / totalValue * 100) : 0;
+
       return PieChartSectionData(
         color: Colors.primaries[
             allCryptos.indexWhere((c) => c.id == item.cryptoId) %
                 Colors.primaries.length],
         value: value,
         title:
-            '${item.cryptoSymbol.toUpperCase()}\n${(value).toStringAsFixed(2)}',
+            '${item.cryptoSymbol.toUpperCase()}\n${percentage.toStringAsFixed(1)}%',
         radius: 60,
         titleStyle: const TextStyle(
           fontSize: 12,
@@ -82,9 +105,19 @@ class PortfolioPieChart extends StatelessWidget {
               'Portfolio Distribution',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
             ),
             const SizedBox(height: 8),
+            const Text(
+              'Your portfolio distribution by cryptocurrency',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 16),
             SizedBox(
               height: 200,
               child: PieChart(
