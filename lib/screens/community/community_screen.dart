@@ -155,17 +155,23 @@ class ChatRoomsTab extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 room.name,
-                style: theme.textTheme.titleMedium,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: room.isActive ? Colors.purple : Colors.grey,
+                  fontSize: 18,
+                ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Expanded(
+                flex: 1,
                 child: Text(
                   room.description,
                   style: theme.textTheme.bodySmall,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.justify,
                 ),
               ),
               const SizedBox(height: 8),
@@ -186,6 +192,7 @@ class ChatRoomsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
               ],
+
               if (!room.isActive) ...[
                 Row(
                   children: [
@@ -212,10 +219,22 @@ class ChatRoomsTab extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.purple,
                     minimumSize: const Size(double.infinity, 36),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 8),
                   ),
                   child: Text(
                     hasJoined ? 'Joined' : 'Join',
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(
+                      color: hasJoined ? Colors.grey : Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      letterSpacing: 1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
               // Oda aktif değilse bir bilgilendirme metni gösterebiliriz (opsiyonel)
@@ -225,8 +244,16 @@ class ChatRoomsTab extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Text(
                     'Room is inactive',
-                    style:
-                        theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 12,
+                      letterSpacing: 1,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
                 ),
             ],
@@ -251,11 +278,20 @@ class PollsTab extends StatelessWidget {
         stream: pollService.getActivePolls(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(
+                color: Colors.purple,
+              ),
+            );
           }
 
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+                child: Text('Error: ${snapshot.error}',
+                    style: const TextStyle(
+                      color: Colors.red,
+                      fontSize: 16,
+                    )));
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -265,7 +301,19 @@ class PollsTab extends StatelessWidget {
                 children: [
                   Icon(Icons.poll_outlined, size: 48, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('No active polls available'),
+                  Text('No active polls available',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center),
+                  SizedBox(height: 8),
+                  Text('Check back later for new polls',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                      textAlign: TextAlign.center),
                 ],
               ),
             );
@@ -303,6 +351,8 @@ class PollsTab extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -315,6 +365,7 @@ class PollsTab extends StatelessWidget {
                     color: poll.isActive ? Colors.green : Colors.grey,
                   ),
                 ),
+                const SizedBox(width: 8),
                 Text(
                   poll.isActive ? 'ACTIVE' : 'CLOSED',
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -322,12 +373,28 @@ class PollsTab extends StatelessWidget {
                     color: poll.isActive ? Colors.green : Colors.grey,
                   ),
                 ),
+                const Spacer(),
+                const Icon(Icons.poll_outlined, color: Colors.purple),
+                const SizedBox(width: 8),
+                Text(
+                  'POLL',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    letterSpacing: 1,
+                    color: Colors.purple,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Text(
               poll.question,
-              style: theme.textTheme.titleLarge,
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+                fontSize: 18,
+              ),
             ),
             const SizedBox(height: 16),
             ...poll.options.map((option) {
@@ -346,7 +413,10 @@ class PollsTab extends StatelessWidget {
                                   .vote(poll.id, poll.options.indexOf(option));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('Vote submitted!')),
+                                    content: Text('Vote submitted!',
+                                        style: TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold))),
                               );
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -369,18 +439,35 @@ class PollsTab extends StatelessWidget {
                           color: hasVoted
                               ? Colors.grey.withOpacity(0.3)
                               : Colors.purple.withOpacity(0.3),
+                          width: 1,
                         ),
+                        boxShadow: hasVoted
+                            ? []
+                            : [
+                                BoxShadow(
+                                  color: Colors.purple.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                       ),
                       child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: Text(
                               option.text,
                               style: TextStyle(
+                                fontWeight: FontWeight.bold,
                                 color: hasVoted || !poll.isActive
                                     ? Colors.grey
                                     : Colors.purple,
+                                fontSize: 16,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.start,
                             ),
                           ),
                           if (canShowResults)
@@ -389,6 +476,7 @@ class PollsTab extends StatelessWidget {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.purple,
+                                fontSize: 16,
                               ),
                             ),
                         ],
@@ -400,9 +488,14 @@ class PollsTab extends StatelessWidget {
                     LinearProgressIndicator(
                       value: totalVotes > 0 ? option.votes / totalVotes : 0,
                       backgroundColor: Colors.grey[200],
+                      color: hasVoted
+                          ? Colors.grey.withOpacity(0.3)
+                          : Colors.purple.withOpacity(0.3),
                       valueColor:
                           const AlwaysStoppedAnimation<Color>(Colors.purple),
                       minHeight: 4,
+                      semanticsLabel: '${option.text} progress',
+                      semanticsValue: '$percentage%',
                     ),
                     const SizedBox(height: 8),
                   ],
@@ -415,6 +508,21 @@ class PollsTab extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.grey.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: hasVoted
+                      ? Colors.grey.withOpacity(0.3)
+                      : Colors.purple.withOpacity(0.3),
+                  width: 1,
+                ),
+                boxShadow: hasVoted
+                    ? []
+                    : [
+                        BoxShadow(
+                          color: Colors.purple.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: Row(
                 children: [
@@ -433,7 +541,12 @@ class PollsTab extends StatelessWidget {
                           : poll.isActive
                               ? 'Select an option to vote'
                               : 'This poll is closed',
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: hasVoted ? Colors.green : Colors.purple,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1,
+                      ),
                     ),
                   ),
                 ],
@@ -460,7 +573,10 @@ class AnnouncementsTab extends StatelessWidget {
         stream: announcementService.getActiveAnnouncements(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+                child: CircularProgressIndicator(
+              color: Colors.purple,
+            ));
           }
 
           if (snapshot.hasError) {
@@ -468,14 +584,30 @@ class AnnouncementsTab extends StatelessWidget {
           }
 
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.announcement_outlined,
                       size: 48, color: Colors.grey),
                   SizedBox(height: 16),
-                  Text('No announcements available'),
+                  Text(
+                    'No announcements available',
+                    style: TextStyle(
+                      fontSize: 18,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black,
+                    ),
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    textScaleFactor: 1.2,
+                    textHeightBehavior: const TextHeightBehavior(
+                      applyHeightToFirstAscent: false,
+                    ),
+                    textWidthBasis: TextWidthBasis.longestLine,
+                  ),
                 ],
               ),
             );
@@ -499,24 +631,44 @@ class AnnouncementsTab extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Card(
+      color: Theme.of(context).brightness == Brightness.dark
+          ? Colors.black38
+          : Colors.white,
       elevation: 2,
       shape: RoundedRectangleBorder(
+        side: BorderSide(
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.white24
+              : Colors.grey.withOpacity(0.2),
+          width: 1,
+          style: BorderStyle.solid,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                const Icon(Icons.campaign, color: Colors.orange),
+                const Icon(
+                  Icons.campaign,
+                  color: Colors.orange,
+                  size: 24,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'ANNOUNCEMENT',
                   style: theme.textTheme.labelSmall?.copyWith(
                     letterSpacing: 1,
                     color: Colors.orange,
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14,
                   ),
                 ),
                 const Spacer(),
@@ -524,6 +676,10 @@ class AnnouncementsTab extends StatelessWidget {
                   _formatDate(announcement.createdAt),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: Colors.grey,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    letterSpacing: 1,
+                    fontStyle: FontStyle.italic,
                   ),
                 ),
               ],
@@ -533,12 +689,26 @@ class AnnouncementsTab extends StatelessWidget {
               announcement.title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+                fontSize: 20,
+                letterSpacing: 1,
+                height: 1.2,
+                textBaseline: TextBaseline.alphabetic,
               ),
             ),
             const SizedBox(height: 8),
             Text(
               announcement.content,
-              style: theme.textTheme.bodyMedium,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white70
+                    : Colors.black54,
+                fontSize: 16,
+                letterSpacing: 1,
+                height: 1.4,
+              ),
             ),
             if (announcement.imageUrl != null) ...[
               const SizedBox(height: 12),
@@ -554,9 +724,20 @@ class AnnouncementsTab extends StatelessWidget {
                     color: Colors.grey[200],
                     child: const Center(child: Icon(Icons.broken_image)),
                   ),
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 150,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -564,6 +745,23 @@ class AnnouncementsTab extends StatelessWidget {
   }
 
   String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inDays < 30) {
+      return '${(difference.inDays / 7).round()} weeks ago';
+    } else if (difference.inDays < 365) {
+      return '${(difference.inDays / 30).round()} months ago';
+    }
+
+    // For dates older than a year, format as "MMM dd, yyyy"
+    // Example: "Jan 01, 2022"
+    // return DateFormat('MMM dd, yyyy').format(date);
     return DateFormat('MMM dd, yyyy').format(date);
   }
 }
