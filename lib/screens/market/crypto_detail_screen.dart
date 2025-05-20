@@ -79,90 +79,77 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          _buildAppBar(context),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeaderCard(isPositive, theme),
-                  const SizedBox(height: 16),
-                  _buildPriceChart(),
-                  const SizedBox(height: 16),
-                  _buildPriceAlertCard(theme),
-                  const SizedBox(height: 16),
-                  _buildMarketDetailsCard(theme),
-                ],
-              ),
+      appBar: AppBar(
+        title: Text(
+          _crypto.name,
+          style: TextStyle(
+              fontSize: 24,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_sharp, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        actions: [
+          IconButton(
+            icon: Icon(
+              _crypto.isFavorite ? Icons.star : Icons.star_border,
+              color: _crypto.isFavorite ? Colors.amber : Colors.white,
             ),
+            onPressed: _toggleFavorite,
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(Icons.notifications_none),
+            onPressed: () => _showAlertsDialog(context),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildAppBar(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 120,
-      pinned: true,
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          _crypto.name,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
-        ),
-        titlePadding: const EdgeInsets.only(left: 72, bottom: 16),
-        background: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.7),
-                Colors.black.withOpacity(0.1),
-              ],
-            ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+              _buildHeaderCard(isPositive, theme),
+              const SizedBox(height: 16),
+              _buildPriceChart(),
+              const SizedBox(height: 16),
+              _buildPriceAlertCard(theme),
+              const SizedBox(height: 16),
+              _buildMarketDetailsCard(theme),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        onPressed: () => Navigator.of(context).pop(),
-      ),
-      actions: [
-        IconButton(
-          icon: Icon(
-            _crypto.isFavorite ? Icons.star : Icons.star_border,
-            color: _crypto.isFavorite ? Colors.amber : Colors.white,
-          ),
-          onPressed: _toggleFavorite,
-        ),
-        IconButton(
-          icon: const Icon(Icons.share),
-          onPressed: () {},
-        ),
-        IconButton(
-          icon: const Icon(Icons.notifications_none),
-          onPressed: () => _showAlertsDialog(context),
-        ),
-      ],
     );
   }
 
   Widget _buildHeaderCard(bool isPositive, ThemeData theme) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isPositive ? Colors.green : Colors.red,
+          width: 0.9,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Hero(
                   tag: 'crypto-${_crypto.id}',
@@ -170,6 +157,16 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     imageUrl: _crypto.image,
                     width: 60,
                     height: 60,
+                    fit: BoxFit.cover,
+                    imageBuilder: (context, imageProvider) => Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        image: DecorationImage(
+                          image: imageProvider,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
                     placeholder: (context, url) =>
                         const CircularProgressIndicator(),
                     errorWidget: (context, url, error) => const Icon(
@@ -183,14 +180,20 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
                         _crypto.symbol.toUpperCase(),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? Colors.black
+                                  : Colors.white,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         _crypto.name,
                         style: TextStyle(
@@ -206,6 +209,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
             ),
             const Divider(height: 32),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
@@ -213,10 +218,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     children: [
                       const Text(
                         'Current Price',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -230,6 +232,7 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                   ),
                 ),
                 Container(
+                  width: 100,
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
@@ -239,6 +242,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Icon(
                         isPositive ? Icons.arrow_upward : Icons.arrow_downward,
@@ -268,10 +273,18 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   Widget _buildPriceChart() {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: Colors.grey.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -301,14 +314,22 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   Widget _buildPriceAlertCard(ThemeData theme) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Colors.grey.withOpacity(0.2),
+            width: 1,
+          )),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'Price Alerts',
@@ -322,13 +343,31 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data!.isNotEmpty) {
                       return TextButton(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          backgroundColor: Colors.grey[200],
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                         onPressed: () => _showAlertsDialog(context),
                         child: Text(
                           'Available Alerts (${snapshot.data!.length})',
                           style: TextStyle(
                             color: theme.primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
+                      );
+                    } else if (snapshot.connectionState ==
+                        ConnectionState.waiting) {
+                      return const CircularProgressIndicator();
+                    } else if (snapshot.hasError) {
+                      return Text(
+                        'Error: ${snapshot.error}',
+                        style: const TextStyle(color: Colors.red),
                       );
                     }
                     return const SizedBox();
@@ -346,12 +385,56 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
                     labelText: 'Target Price',
+                    labelStyle: TextStyle(
+                      color:
+                          theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
                     prefixText: '\$',
+                    prefixStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.grey.withOpacity(0.2),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: theme.primaryColor,
+                      ),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 16),
+                  ),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _priceAlertController.text = value;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Set an alert for when the price goes above or below your target.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Note: Alerts are set for the current price.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
                   ),
                 ),
               ],
@@ -367,14 +450,32 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: Colors.grey.withOpacity(0.2),
+                      width: 1,
+                    ),
                   ),
                 ),
-                child: const Text(
+                child: Text(
                   'Set Price Alert',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
+                    color: Theme.of(context).brightness == Brightness.light
+                        ? Colors.white
+                        : Colors.black,
                   ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: const Text(
+                'You will be notified when the price reaches your target.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey,
                 ),
               ),
             ),
@@ -394,6 +495,16 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           isExpanded: true,
+          icon: const Icon(Icons.arrow_drop_down),
+          iconSize: 24,
+          iconEnabledColor: Colors.grey,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+          dropdownColor: Colors.white,
+          borderRadius: BorderRadius.circular(12),
           value: _selectedAlertType,
           items: [
             DropdownMenuItem(
@@ -402,7 +513,13 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                 children: [
                   const Icon(Icons.arrow_upward, color: Colors.green, size: 18),
                   const SizedBox(width: 8),
-                  const Text('Above'),
+                  const Text('Above',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                        fontStyle: FontStyle.italic,
+                      )),
                 ],
               ),
             ),
@@ -412,7 +529,13 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                 children: [
                   const Icon(Icons.arrow_downward, color: Colors.red, size: 18),
                   const SizedBox(width: 8),
-                  const Text('Below'),
+                  const Text('Below',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.red,
+                        fontStyle: FontStyle.italic,
+                      )),
                 ],
               ),
             ),
@@ -420,6 +543,10 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
           onChanged: (value) {
             setState(() {
               _selectedAlertType = value!;
+              _priceAlertController.text = _crypto.currentPrice.toString();
+              _priceAlertController.selection = TextSelection.fromPosition(
+                TextPosition(offset: _priceAlertController.text.length),
+              );
             });
           },
         ),
@@ -464,6 +591,14 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
             '${_crypto.symbol.toUpperCase()} for ${_selectedAlertType == 'above' ? 'above' : 'below'} alarm set: \$${_formatPrice(alertPrice)}',
           ),
           backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+          action: SnackBarAction(
+            label: 'OK',
+            textColor: Colors.white,
+            onPressed: () {
+              // Some action
+            },
+          ),
         ),
       );
     } catch (e) {
@@ -478,10 +613,17 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Price Alerts'),
+        title: Text('Price Alerts',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).brightness == Brightness.light
+                  ? Colors.black
+                  : Colors.white,
+            )),
         content: SizedBox(
           width: double.maxFinite,
-          height: 300, // Sabit bir yükseklik ver
+          height: 400,
           child: StreamBuilder<List<PriceAlert>>(
             stream: alertsStream,
             builder: (context, snapshot) {
@@ -493,6 +635,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
 
               if (snapshot.hasError) {
                 return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Icon(Icons.error, color: Colors.red, size: 48),
@@ -509,7 +653,11 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(height: 16),
-                      Text('Loading alerts...'),
+                      Text('Loading alerts...',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          )),
                     ],
                   ),
                 );
@@ -531,10 +679,24 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     ),
                     title: Text(
                       '${alert.cryptoSymbol.toUpperCase()} ${alert.isAbove ? 'when above' : 'when below'}',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    subtitle: Text('\$${_formatPrice(alert.targetPrice)}'),
+                    subtitle: Text('\$${_formatPrice(alert.targetPrice)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        )),
                     trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Colors.red),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                        size: 20,
+                        semanticLabel: 'Delete Alert',
+                      ),
+                      tooltip: 'Delete Alert',
                       onPressed: () => _removeAlert(alert.id),
                     ),
                   );
@@ -546,7 +708,12 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text('Close',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                )),
           ),
         ],
       ),
@@ -585,6 +752,9 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                       fontSize: 12,
                       color: period == '1M' ? Colors.white : Colors.grey,
                       fontWeight: FontWeight.bold,
+                      fontStyle: FontStyle.italic,
+                      decoration:
+                          period == '1M' ? TextDecoration.underline : null,
                     ),
                   ),
                 ),
@@ -598,10 +768,17 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   Widget _buildMarketDetailsCard(ThemeData theme) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: Colors.grey.withOpacity(0.2),
+            width: 1,
+          )),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
@@ -646,9 +823,15 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       decoration: BoxDecoration(
         color: theme.cardColor.withOpacity(0.5),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.2)),
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.2),
+          width: 1,
+          style: BorderStyle.solid,
+        ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
@@ -656,6 +839,12 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
             style: TextStyle(
               fontSize: 12,
               color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+              decoration: TextDecoration.underline,
+              decorationColor: theme.primaryColor,
+              decorationThickness: 2,
+              decorationStyle: TextDecorationStyle.solid,
             ),
           ),
           const SizedBox(height: 4),
@@ -678,6 +867,8 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
     final percentCirculating = (circulating / total * 100).clamp(0, 100);
 
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
@@ -689,19 +880,31 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
         ),
         const SizedBox(height: 8),
         Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               flex: 3,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Circulating Supply',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                   Text(
                     '${_formatNumber(circulating)} ${_crypto.symbol.toUpperCase()}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -709,15 +912,24 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
             Expanded(
               flex: 2,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'Total Supply',
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.bold,
+                        fontStyle: FontStyle.italic),
                   ),
                   Text(
                     _formatNumber(total),
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ],
               ),
@@ -729,17 +941,30 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
           value: percentCirculating / 100,
           backgroundColor: Colors.grey.withOpacity(0.2),
           valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
+          minHeight: 8,
+          semanticsLabel: 'Supply Progress',
         ),
         const SizedBox(height: 4),
         Text(
           '${percentCirculating.toStringAsFixed(1)}% of total supply in circulation',
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: const TextStyle(
+            fontSize: 12,
+            color: Colors.grey,
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ],
     );
   }
 
   String _formatNumber(double number) {
+    if (number >= 1e12) return '${(number / 1e12).toStringAsFixed(2)}T';
+    if (number >= 1e11) return '${(number / 1e11).toStringAsFixed(2)}B';
+    if (number >= 1e10) return '${(number / 1e10).toStringAsFixed(2)}B';
+    if (number >= 1e9 && number < 1e10) {
+      return '${(number / 1e9).toStringAsFixed(2)}B';
+    }
     if (number >= 1e9) return '${(number / 1e9).toStringAsFixed(2)}B';
     if (number >= 1e6) return '${(number / 1e6).toStringAsFixed(2)}M';
     if (number >= 1e3) return '${(number / 1e3).toStringAsFixed(2)}K';
@@ -747,6 +972,16 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   }
 
   String _formatPrice(double price) {
+    if (price.isNaN || price.isInfinite) {
+      return 'N/A';
+    }
+    if (price < 0) {
+      return 'N/A';
+    }
+    if (price == 0) {
+      return '0.00';
+    }
+
     if (price < 1) {
       return price
           .toStringAsFixed(6)
@@ -781,6 +1016,14 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
+        duration: const Duration(seconds: 2),
+        action: SnackBarAction(
+          label: 'OK',
+          textColor: Colors.white,
+          onPressed: () {
+            // Some action
+          },
+        ),
       ),
     );
   }

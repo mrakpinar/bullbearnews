@@ -20,7 +20,7 @@ class _VideosScreenState extends State<VideosScreen> {
     'Teknoloji',
     'Sağlık'
   ];
-  String _selectedCategory = 'All';
+  final String _selectedCategory = 'All';
   bool _isLoading = true;
 
   @override

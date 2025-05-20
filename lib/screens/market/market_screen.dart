@@ -171,6 +171,7 @@ class _MarketScreenState extends State<MarketScreen> {
           'Crypto Market',
           style: TextStyle(
             fontWeight: FontWeight.bold,
+            fontSize: 20,
           ),
         ),
         centerTitle: true,
@@ -178,27 +179,61 @@ class _MarketScreenState extends State<MarketScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 10.0),
             child: IconButton(
-              icon: const Icon(Icons.refresh_sharp),
+              icon: const Icon(Icons.refresh_sharp, size: 30), // Refresh icon
               onPressed: _loadCryptoData,
             ),
           ),
         ],
+        iconTheme: IconThemeData(
+          color: isDarkMode ? Colors.white : Colors.black,
+        ),
+        elevation: 0,
+        toolbarHeight: 60,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(20),
+          ),
+        ),
       ),
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisSize: MainAxisSize.max,
         children: [
           // Arama çubuğu
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12),
             child: TextField(
+              style: TextStyle(
+                color: isDarkMode ? Colors.white : Colors.black,
+              ),
+              cursorColor: isDarkMode ? Colors.white : Colors.black,
+              cursorHeight: 20,
+              cursorWidth: 2,
+              textAlignVertical: TextAlignVertical.center,
+              textAlign: TextAlign.start,
               decoration: InputDecoration(
                 hintText: 'Search crypto...',
-                prefixIcon: const Icon(Icons.search),
+                prefixIcon:
+                    const Icon(Icons.search, size: 20, color: Colors.grey),
+                hintStyle: TextStyle(
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!,
+                  ),
                 ),
                 contentPadding: const EdgeInsets.symmetric(vertical: 0),
                 filled: true,
                 fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(
+                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!,
+                  ),
+                ),
               ),
               onChanged: (value) {
                 setState(() {
@@ -256,12 +291,26 @@ class _MarketScreenState extends State<MarketScreen> {
                                     );
                                   },
                                   child: Card(
+                                    color: isDarkMode
+                                        ? Colors.grey[800]
+                                        : Colors.white,
                                     margin: const EdgeInsets.symmetric(
                                         horizontal: 16, vertical: 8),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    shadowColor: isDarkMode
+                                        ? Colors.grey[700]
+                                        : Colors.grey[300],
                                     elevation: 2,
                                     child: Padding(
                                       padding: const EdgeInsets.all(12.0),
                                       child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        mainAxisSize: MainAxisSize.max,
                                         children: [
                                           // Leading - Crypto image
                                           SizedBox(
@@ -272,8 +321,10 @@ class _MarketScreenState extends State<MarketScreen> {
                                               errorBuilder:
                                                   (context, error, stackTrace) {
                                                 return const Icon(
-                                                    Icons.currency_bitcoin,
-                                                    size: 40);
+                                                  Icons.currency_bitcoin,
+                                                  size: 40,
+                                                  color: Colors.grey,
+                                                );
                                               },
                                             ),
                                           ),
@@ -284,6 +335,9 @@ class _MarketScreenState extends State<MarketScreen> {
                                             child: Column(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
+                                              mainAxisSize: MainAxisSize.min,
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
                                               children: [
                                                 Row(
                                                   children: [
@@ -291,9 +345,10 @@ class _MarketScreenState extends State<MarketScreen> {
                                                       child: Text(
                                                         crypto.name,
                                                         style: const TextStyle(
-                                                            fontWeight:
-                                                                FontWeight
-                                                                    .bold),
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontSize: 16,
+                                                        ),
                                                         overflow: TextOverflow
                                                             .ellipsis,
                                                       ),
@@ -322,6 +377,17 @@ class _MarketScreenState extends State<MarketScreen> {
                                                   overflow:
                                                       TextOverflow.ellipsis,
                                                 ),
+                                                Text(
+                                                  'Volume: \$${_formatNumber(crypto.totalVolume)}',
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isDarkMode
+                                                        ? Colors.grey[400]
+                                                        : Colors.grey[600],
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -332,10 +398,17 @@ class _MarketScreenState extends State<MarketScreen> {
                                             child: Row(
                                               mainAxisAlignment:
                                                   MainAxisAlignment.end,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.center,
+                                              mainAxisSize: MainAxisSize.max,
                                               children: [
                                                 Column(
                                                   crossAxisAlignment:
                                                       CrossAxisAlignment.end,
+                                                  mainAxisSize:
+                                                      MainAxisSize.min,
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment.center,
                                                   children: [
                                                     Text(
                                                       '\$${formatPrice(crypto.currentPrice)}',
@@ -350,6 +423,11 @@ class _MarketScreenState extends State<MarketScreen> {
                                                     Row(
                                                       mainAxisSize:
                                                           MainAxisSize.min,
+                                                      mainAxisAlignment:
+                                                          MainAxisAlignment.end,
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .center,
                                                       children: [
                                                         Icon(
                                                           isPositive
@@ -389,14 +467,24 @@ class _MarketScreenState extends State<MarketScreen> {
                                                         : isDarkMode
                                                             ? Colors.white
                                                             : Colors.grey,
+                                                    size: 20,
                                                   ),
                                                   onPressed: () {
                                                     _toggleFavorite(crypto.id);
                                                   },
+                                                  tooltip: crypto.isFavorite
+                                                      ? 'Remove from favorites'
+                                                      : 'Add to favorites',
                                                   padding: EdgeInsets.zero,
                                                   constraints:
                                                       const BoxConstraints(),
                                                   iconSize: 20,
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  splashRadius: 20,
+                                                  highlightColor: isDarkMode
+                                                      ? Colors.grey[700]
+                                                      : Colors.grey[300],
                                                 ),
                                               ],
                                             ),
@@ -428,6 +516,8 @@ class _MarketScreenState extends State<MarketScreen> {
             color: isSelected
                 ? (isDarkMode ? Colors.white : Colors.white)
                 : (isDarkMode ? Colors.white : Colors.black),
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
           ),
         ),
         selected: isSelected,
