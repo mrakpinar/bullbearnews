@@ -58,29 +58,13 @@ class _VideosScreenState extends State<VideosScreen> {
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 22,
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.black
+                : Colors.white,
           ),
         ),
         elevation: 0,
         centerTitle: true,
-        actions: [
-          PopupMenuButton<String>(
-            icon: Icon(Icons.filter_list),
-            onSelected: (String category) {
-              setState(() {
-                _selectedCategory = category;
-              });
-              _loadVideos();
-            },
-            itemBuilder: (BuildContext context) {
-              return _categories.map((String category) {
-                return PopupMenuItem<String>(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList();
-            },
-          ),
-        ],
       ),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
@@ -92,12 +76,28 @@ class _VideosScreenState extends State<VideosScreen> {
                   ),
                 )
               : RefreshIndicator(
+                  color: Theme.of(context).primaryColor,
+                  backgroundColor:
+                      Theme.of(context).brightness == Brightness.light
+                          ? Colors.white
+                          : Colors.black,
                   onRefresh: _loadVideos,
                   child: ListView.builder(
+                    shrinkWrap: true,
                     padding: EdgeInsets.all(16),
                     itemCount: _allVideos.length,
                     itemBuilder: (context, index) {
-                      return VideoCard(video: _allVideos[index]);
+                      if (index == _allVideos.length - 1) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: VideoCard(video: _allVideos[index]),
+                        );
+                      }
+                      return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: index == _allVideos.length - 1
+                              ? VideoCard(video: _allVideos[index])
+                              : VideoCard(video: _allVideos[index]));
                     },
                   ),
                 ),
