@@ -74,7 +74,10 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
         ),
         centerTitle: true,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_sharp, size: 20),
+          icon: const Icon(
+            Icons.arrow_back_ios_new_sharp,
+            size: 20,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
       ),

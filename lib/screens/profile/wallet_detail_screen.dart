@@ -1,4 +1,5 @@
 import 'package:bullbearnews/models/wallet_model.dart';
+import 'package:bullbearnews/screens/profile/edit_asset_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -63,6 +64,56 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading wallet: $e')),
       );
+    }
+  }
+
+  Future<void> _editAsset(WalletItem item) async {
+    final updatedItem = await Navigator.push<WalletItem>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditAssetScreen(
+          item: item,
+          onSave: (updatedItem) async {
+            try {
+              // Önce local state'i güncelle
+              final updatedItems = _wallet.items
+                  .map((i) => i.id == updatedItem.id ? updatedItem : i)
+                  .toList();
+
+              setState(() {
+                _wallet = _wallet.copyWith(items: updatedItems);
+              });
+
+              // Sonra Firestore'u güncelle
+              await _firestore
+                  .collection('users')
+                  .doc(_auth.currentUser!.uid)
+                  .collection('wallets')
+                  .doc(_wallet.id)
+                  .update({
+                'items': updatedItems.map((e) => e.toJson()).toList(),
+              });
+
+              // Parent widget'ı bilgilendir
+              widget.onUpdate();
+
+              return updatedItem;
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error updating asset: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+              rethrow;
+            }
+          },
+        ),
+      ),
+    );
+
+    if (updatedItem != null) {
+      await _loadWallet(); // Verileri yeniden yükle
     }
   }
 
@@ -163,20 +214,52 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                           false;
                     },
                     onDismissed: (direction) async {
-                      // Remove the item from the wallet
-                      setState(() {
-                        _wallet.items.removeAt(index);
-                      });
-                      // Optionally, update Firestore here if needed
-                      await _firestore
-                          .collection('users')
-                          .doc(_auth.currentUser!.uid)
-                          .collection('wallets')
-                          .doc(_wallet.id)
-                          .update({
-                        'items': _wallet.items.map((e) => e.toJson()).toList(),
-                      });
-                      widget.onUpdate();
+                      try {
+                        // Önce local state'i güncelle
+                        final removedItem = _wallet.items[index];
+                        final updatedItems =
+                            List<WalletItem>.from(_wallet.items);
+                        updatedItems.removeAt(index);
+
+                        setState(() {
+                          _wallet = _wallet.copyWith(items: updatedItems);
+                        });
+
+                        // Sonra Firestore'u güncelle
+                        await _firestore
+                            .collection('users')
+                            .doc(_auth.currentUser!.uid)
+                            .collection('wallets')
+                            .doc(_wallet.id)
+                            .update({
+                          'items': updatedItems.map((e) => e.toJson()).toList(),
+                        });
+
+                        // Parent widget'ı bilgilendir
+                        widget.onUpdate();
+
+                        // Başarı mesajı göster
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                  '${removedItem.cryptoName} removed from wallet'),
+                              duration: const Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        // Hata durumunda wallet'ı yeniden yükle
+                        await _loadWallet();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error removing asset: $e'),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
                     },
                     background: Container(
                       alignment: Alignment.centerRight,
@@ -246,33 +329,35 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
 
   Widget _buildWalletItem(WalletItem item) {
     return ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: Colors.transparent,
-          child: item.cryptoImage.isEmpty
-              ? const Icon(Icons.question_mark, size: 24)
-              : ClipOval(
-                  child: Image.network(
-                    item.cryptoImage,
-                    width: 48,
-                    height: 48,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.error, size: 24);
-                    },
-                  ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: CircleAvatar(
+        radius: 24,
+        backgroundColor: Colors.transparent,
+        child: item.cryptoImage.isEmpty
+            ? const Icon(Icons.question_mark, size: 24)
+            : ClipOval(
+                child: Image.network(
+                  item.cryptoImage,
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(Icons.error, size: 24);
+                  },
                 ),
+              ),
+      ),
+      title: Text(item.cryptoName),
+      subtitle: Text('${item.amount} ${item.cryptoSymbol.toUpperCase()}',
+          style: const TextStyle(fontSize: 16)),
+      trailing: Text(
+        '\$${(item.amount * item.buyPrice).toStringAsFixed(2)}',
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.bold,
         ),
-        title: Text(item.cryptoName),
-        subtitle: Text('${item.amount} ${item.cryptoSymbol.toUpperCase()}',
-            style: const TextStyle(fontSize: 16)),
-        trailing: Text(
-          '\$${(item.amount * item.buyPrice).toStringAsFixed(2)}',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ));
+      ),
+      onTap: () => _editAsset(item), // Bu satırı ekleyin
+    );
   }
 }
