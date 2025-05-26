@@ -1,4 +1,5 @@
 import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
+import 'package:bullbearnews/screens/profile/settings_screen.dart';
 import 'package:bullbearnews/screens/profile/wallets_screen.dart';
 import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
@@ -390,6 +391,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
 
     return Scaffold(
+      drawer: _buildDrawer(context),
       appBar: AppBar(
         title: const Text(
           'Profile',
@@ -398,13 +400,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
             fontSize: 26,
           ),
         ),
+        centerTitle: true,
+        elevation: 4,
         actions: [
-          IconButton(
-            icon: Icon(themeProvider.themeMode == ThemeMode.dark
-                ? Icons.light_mode
-                : Icons.dark_mode),
-            onPressed: () => themeProvider.toggleTheme(),
-          ),
+          // IconButton(
+          //   icon: Icon(themeProvider.themeMode == ThemeMode.dark
+          //       ? Icons.light_mode
+          //       : Icons.dark_mode),
+          //   onPressed: () => themeProvider.toggleTheme(),
+          // ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async => await FirebaseAuth.instance.signOut(),
@@ -481,6 +485,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDarkMode = theme.brightness == Brightness.dark;
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Drawer(
+      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topRight: Radius.circular(20),
+          bottomRight: Radius.circular(20),
+        ),
+        side: BorderSide(
+          color: isDarkMode ? Colors.grey[800]! : Colors.purple[300]!,
+          width: 1,
+        ),
+      ),
+      elevation: 4,
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          DrawerHeader(
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey[800]! : Colors.purple[300]!,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(20),
+                bottomRight: Radius.circular(20),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: isDarkMode ? Colors.black54 : Colors.grey[300]!,
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // User profile image and name
+                CircleAvatar(
+                  radius: 30,
+                  backgroundImage: _profileImageUrl != null
+                      ? NetworkImage(_profileImageUrl!)
+                      : const AssetImage('assets/default_profile.png')
+                          as ImageProvider,
+                ),
+
+                const SizedBox(height: 10),
+                Text(
+                  user?.displayName ?? 'Guest',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    shadows: [
+                      Shadow(
+                        color: isDarkMode ? Colors.black54 : Colors.grey[300]!,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  user?.email ?? 'Not logged in',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListTile(
+            leading: Icon(Icons.home, color: theme.iconTheme.color),
+            title: const Text('Home'),
+            onTap: () {
+              Navigator.pop(context); // Drawer'ı kapat
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/auth',
+                (route) => false, // Tüm önceki route'ları temizler
+              );
+            },
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withOpacity(0.1),
+          ),
+          ListTile(
+            leading: Icon(Icons.account_balance_wallet,
+                color: theme.iconTheme.color),
+            title: const Text('Wallet'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => WalletsScreen()),
+              );
+            },
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withOpacity(0.1),
+          ),
+          ListTile(
+            leading: Icon(Icons.settings, color: theme.iconTheme.color),
+            title: const Text('Settings'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(context,
+                  MaterialPageRoute(builder: (context) => SettingsScreen()));
+              // Settings ekranına yönlendirme yapabilirsiniz
+            },
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withOpacity(0.1),
+          ),
+          ListTile(
+            leading: Icon(Icons.help_outline, color: theme.iconTheme.color),
+            title: const Text('Help & Feedback'),
+            onTap: () {
+              Navigator.pop(context);
+              // Help ekranına yönlendirme yapabilirsiniz
+            },
+          ),
+        ],
       ),
     );
   }

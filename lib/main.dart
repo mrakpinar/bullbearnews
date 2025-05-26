@@ -1,5 +1,6 @@
 import 'package:bullbearnews/connectivity_service.dart';
 import 'package:bullbearnews/models/news_model.dart';
+import 'package:bullbearnews/screens/home/home_screen.dart';
 import 'package:bullbearnews/services/local_storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -96,6 +97,10 @@ class _MyAppState extends State<MyApp> {
       darkTheme: _buildDarkTheme(),
       themeMode: themeProvider.themeMode,
       home: AuthWrapper(showOfflineBanner: !_isOnline),
+      routes: {
+        '/home': (context) => HomeScreen(),
+        '/auth': (context) => AuthWrapper(),
+      },
     );
   }
 
