@@ -65,8 +65,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
         physics: const NeverScrollableScrollPhysics(),
         children: _screens,
       ),
-      extendBody:
-          true, // Bu sayede body içeriği navigation bar'ın arkasına kadar uzanacak
+      extendBody: true,
       bottomNavigationBar: _buildModernNavigationBar(context),
     );
   }
@@ -122,6 +121,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       child: InkWell(
         onTap: () => _onItemTapped(index),
         borderRadius: BorderRadius.circular(30),
+        splashColor: primaryColor.withOpacity(0.2),
+        highlightColor: primaryColor.withOpacity(0.1),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 300),
           decoration: BoxDecoration(
@@ -159,12 +160,24 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     title,
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
                     style: TextStyle(
                       color: Theme.of(context).brightness == Brightness.light
                           ? primaryColor
                           : Colors.white,
                       fontSize: 12,
+                      fontStyle: FontStyle.italic,
                       fontWeight: FontWeight.w600,
+                      shadows: [
+                        Shadow(
+                          color: isDarkMode
+                              ? Colors.black.withOpacity(0.5)
+                              : Colors.grey.withOpacity(0.5),
+                          offset: const Offset(1, 1),
+                          blurRadius: 2,
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -64,8 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
           'BBN',
           style: TextStyle(
             fontWeight: FontWeight.bold,
+            fontStyle: FontStyle.italic,
             fontSize: 25,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
           ),
+          textAlign: TextAlign.center,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         elevation: 0,
         centerTitle: true,
@@ -116,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: CircularProgressIndicator(
               color: Theme.of(context).colorScheme.primaryContainer,
               strokeWidth: 2,
+              backgroundColor: Theme.of(context).colorScheme.background,
             ))
           : RefreshIndicator(
               color: Theme.of(context).colorScheme.primaryContainer,

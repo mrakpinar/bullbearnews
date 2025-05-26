@@ -20,6 +20,7 @@ class _NewsCardState extends State<NewsCard> {
       width: double.infinity,
       margin: EdgeInsets.only(bottom: 16),
       padding: EdgeInsets.all(0),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         border: Border.all(
@@ -56,7 +57,10 @@ class _NewsCardState extends State<NewsCard> {
               // Haber resmi
               ClipRRect(
                 clipBehavior: Clip.antiAlias,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(16),
+                  bottom: Radius.circular(16),
+                ),
                 child: CachedNetworkImage(
                   imageUrl: widget.news.imageUrl,
                   height: 200,
@@ -88,6 +92,7 @@ class _NewsCardState extends State<NewsCard> {
               Padding(
                 padding: EdgeInsets.all(16),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Kategori ve tarih

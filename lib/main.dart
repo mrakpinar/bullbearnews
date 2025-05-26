@@ -81,6 +81,8 @@ class _MyAppState extends State<MyApp> {
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.red,
           textColor: Colors.white,
+          fontSize: 16.0,
+          timeInSecForIosWeb: 2,
         );
       }
     }
@@ -113,6 +115,8 @@ class _MyAppState extends State<MyApp> {
         secondary: Colors.purpleAccent[100]!,
         background: Colors.grey[100]!,
         primaryContainer: Colors.grey[400]!,
+        onPrimary: Colors.white,
+        onSecondary: Colors.black,
       ),
     );
   }
@@ -126,6 +130,8 @@ class _MyAppState extends State<MyApp> {
         secondary: Colors.purpleAccent[700]!,
         background: Colors.grey[900]!,
         primaryContainer: Colors.grey[800]!,
+        onPrimary: Colors.white,
+        onSecondary: Colors.white,
       ),
     );
   }
