@@ -116,7 +116,8 @@ class WalletSummaryCard extends StatelessWidget {
                 const SizedBox(height: 36),
                 ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: isDarkMode ? Colors.amber : Colors.blue,
+                    backgroundColor:
+                        isDarkMode ? Colors.amber : Colors.purpleAccent,
                     padding: const EdgeInsets.symmetric(
                       vertical: 10,
                       horizontal: 20,

@@ -5,6 +5,7 @@ import 'package:bullbearnews/services/crypto_service.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 import 'add_wallet_screen.dart';
 
 class WalletsScreen extends StatefulWidget {
@@ -73,6 +74,58 @@ class _WalletsScreenState extends State<WalletsScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error deleting wallet: $e')),
+      );
+    }
+  }
+
+  Future<void> _shareWallet(Wallet wallet) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Paylaşım bilgisini Firestore'a kaydet
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('sharedPortfolios')
+          .doc(wallet.id)
+          .set({
+        'walletId': wallet.id,
+        'sharedAt': FieldValue.serverTimestamp(),
+        'isPublic': true,
+        'viewCount': 0,
+        'likes': [],
+      });
+
+      // Paylaşılabilir link oluştur
+      final shareLink =
+          'https://yourapp.com/portfolio/${user.uid}/${wallet.id}';
+      final shareText = 'Check out my crypto portfolio: $shareLink';
+
+      // Paylaşım dialogu göster
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text('Portfolio Shared'),
+          content: Text('Your portfolio has been shared successfully!'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('OK'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await Share.share(shareText); // share_plus paketi gereklidir
+              },
+              child: Text('Share Link'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sharing portfolio: $e')),
       );
     }
   }
@@ -159,7 +212,16 @@ class _WalletsScreenState extends State<WalletsScreen> {
               );
               _loadWallets();
             },
-            child: const Text('Create Your First Wallet'),
+            child: Text(
+              'Create Your First Wallet',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.white
+                    : Colors.black,
+              ),
+            ),
           ),
         ],
       ),
@@ -214,9 +276,14 @@ class _WalletsScreenState extends State<WalletsScreen> {
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.share),
+                      icon: const Icon(
+                        Icons.share,
+                        size: 24,
+                        color: Colors.blue,
+                      ),
                       tooltip: 'Share Wallet',
                       onPressed: () {
+                        _shareWallet(wallet);
                         final shareText =
                             'Wallet: ${wallet.name}\nAssets: ${wallet.items.length}\nCurrent Value: \$${currentValue.toStringAsFixed(2)}\nProfit/Loss: \$${profitLoss.abs().toStringAsFixed(2)} ${isProfit ? "(Profit)" : "(Loss)"}';
                         // You can use Share.share from the 'share_plus' package here

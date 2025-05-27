@@ -1,5 +1,6 @@
 import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
 import 'package:bullbearnews/screens/profile/settings_screen.dart';
+import 'package:bullbearnews/screens/profile/wallet_detail_screen.dart';
 import 'package:bullbearnews/screens/profile/wallets_screen.dart';
 import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
@@ -43,17 +44,144 @@ class _ProfileScreenState extends State<ProfileScreen> {
   double _totalProfitLoss = 0;
   double _totalProfitLossPercentage = 0;
   String? _profileImageUrl;
+  List<Map<String, dynamic>> _mySharedPortfolios = [];
+  bool _isLoadingSharedPortfolios = true;
 
   @override
   void initState() {
     super.initState();
     _loadProfileImage();
     _loadData();
+    _loadMySharedPortfolios();
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  Future<void> _loadMySharedPortfolios() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('sharedPortfolios')
+          .get();
+
+      setState(() {
+        _mySharedPortfolios = snapshot.docs.map((doc) => doc.data()).toList();
+        _isLoadingSharedPortfolios = false;
+      });
+    } catch (e) {
+      setState(() => _isLoadingSharedPortfolios = false);
+    }
+  }
+
+  Widget _buildSharedPortfoliosSection() {
+    if (_isLoadingSharedPortfolios) {
+      return Center(child: CircularProgressIndicator());
+    }
+
+    if (_mySharedPortfolios.isEmpty) {
+      return SizedBox(); // Boşsa hiçbir şey gösterme
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Text(
+            'My Shared Portfolios',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+        ..._mySharedPortfolios
+            .map((portfolio) => _buildSharedPortfolioItem(portfolio)),
+      ],
+    );
+  }
+
+  Widget _buildSharedPortfolioItem(Map<String, dynamic> portfolio) {
+    return FutureBuilder<DocumentSnapshot>(
+      future: FirebaseFirestore.instance
+          .collection('users')
+          .doc(FirebaseAuth.instance.currentUser!.uid)
+          .collection('wallets')
+          .doc(portfolio['walletId'])
+          .get(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return ListTile(title: Text('Loading...'));
+        }
+
+        final wallet =
+            Wallet.fromJson(snapshot.data!.data() as Map<String, dynamic>);
+        return Card(
+          child: ListTile(
+            leading: Icon(Icons.wallet),
+            title: Text(wallet.name),
+            subtitle: Text(
+                'Views: ${portfolio['viewCount']} • Likes: ${portfolio['likes']?.length ?? 0}'),
+            trailing: IconButton(
+              icon: Icon(Icons.delete),
+              onPressed: () => _unsharePortfolio(portfolio['walletId']),
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WalletDetailScreen(
+                    wallet: wallet,
+                    onUpdate: () async {
+                      await _loadWalletItems();
+                      if (mounted) setState(() {});
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _unsharePortfolio(String walletId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Unshare Portfolio'),
+        content: Text('Do you want to stop sharing this portfolio?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Unshare'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .collection('sharedPortfolios')
+            .doc(walletId)
+            .delete();
+
+        _loadMySharedPortfolios();
+      }
+    }
   }
 
   Future<void> _loadProfileImage() async {
@@ -480,7 +608,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 const SizedBox(height: 32),
                 SavedNewsList(
-                    isLoading: _isNewsLoading, onRefresh: _loadSaveNews)
+                    isLoading: _isNewsLoading, onRefresh: _loadSaveNews),
+                const SizedBox(height: 32),
+                _buildSharedPortfoliosSection(),
               ],
             ),
           ),

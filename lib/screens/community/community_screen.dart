@@ -36,37 +36,56 @@ class _CommunityScreenState extends State<CommunityScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Community',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
+        // title: const Text(
+        //   'Community',
+        //   style: TextStyle(
+        //     fontWeight: FontWeight.bold,
+        //     fontSize: 24,
+        //     letterSpacing: 1.2,
+        //     wordSpacing: 1.5,
+        //     fontFamily: 'Roboto',
+        //   ),
+        // ),
+        // centerTitle: true,
+
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.purple,
           labelColor: Colors.purple,
-          unselectedLabelColor: Colors.grey,
+          unselectedLabelColor: Colors.grey[600],
+          dividerColor: Colors.transparent, // TabBar altındaki çizgiyi kaldırır
           // isScrollable: true, // Bu satırı kaldırabilirsiniz (sabit genişlik için)
-          padding: const EdgeInsets.symmetric(horizontal: 16.0),
           labelPadding: const EdgeInsets.symmetric(horizontal: 16.0),
           indicator: UnderlineTabIndicator(
             borderSide: BorderSide(width: 3.0, color: Colors.purple),
-            insets: EdgeInsets.symmetric(horizontal: 16.0),
           ),
           tabs: const [
-            Tab(icon: Icon(Icons.forum_outlined), text: 'Chat Rooms'),
-            Tab(icon: Icon(Icons.poll_outlined), text: 'Polls'),
-            Tab(icon: Icon(Icons.announcement_outlined), text: 'Announcements'),
+            Tab(
+              icon: Icon(
+                Icons.forum_outlined,
+                size: 32,
+              ),
+            ),
+            Tab(
+              icon: Icon(
+                Icons.poll_outlined,
+                size: 32,
+              ),
+            ),
+            Tab(
+              icon: Icon(
+                Icons.announcement_outlined,
+                size: 32,
+              ),
+            ),
           ],
         ),
       ),
       body: TabBarView(
         controller: _tabController,
         children: const [
-          ChatRoomsTab(),
           PollsTab(),
+          ChatRoomsTab(),
           AnnouncementsTab(),
         ],
       ),
@@ -156,9 +175,14 @@ class ChatRoomsTab extends StatelessWidget {
               Text(
                 room.name,
                 style: TextStyle(
-                  fontWeight: FontWeight.bold,
                   color: room.isActive ? Colors.purple : Colors.grey,
                   fontSize: 18,
+                  letterSpacing: 1,
+                  height: 1.2,
+                  fontFamily: 'Roboto',
+                  fontWeight: FontWeight.w600,
+                  fontStyle: FontStyle.normal,
+                  textBaseline: TextBaseline.alphabetic,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -168,7 +192,15 @@ class ChatRoomsTab extends StatelessWidget {
                 flex: 1,
                 child: Text(
                   room.description,
-                  style: theme.textTheme.bodySmall,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: room.isActive ? Colors.grey : Colors.grey,
+                    fontSize: 14,
+                    letterSpacing: 0.5,
+                    height: 1.4,
+                    fontFamily: 'Roboto',
+                    fontWeight: FontWeight.w400,
+                    textBaseline: TextBaseline.alphabetic,
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.justify,
@@ -186,7 +218,12 @@ class ChatRoomsTab extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       '${room.users.length} members',
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                        height: 1.4,
+                      ),
                     ),
                   ],
                 ),
@@ -206,6 +243,10 @@ class ChatRoomsTab extends StatelessWidget {
                       'Closed',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.grey,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                        height: 1.4,
+                        fontStyle: FontStyle.italic,
                       ),
                     ),
                   ],
@@ -231,6 +272,9 @@ class ChatRoomsTab extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                       letterSpacing: 1,
+                      fontFamily: 'Roboto',
+                      fontStyle: FontStyle.normal,
+                      textBaseline: TextBaseline.alphabetic,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -250,6 +294,7 @@ class ChatRoomsTab extends StatelessWidget {
                       fontSize: 12,
                       letterSpacing: 1,
                       fontWeight: FontWeight.w500,
+                      fontFamily: 'Roboto',
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -341,19 +386,20 @@ class PollsTab extends StatelessWidget {
     final totalVotes = canShowResults
         ? poll.options.fold(0, (sum, option) => sum + option.votes)
         : 0;
+    final selectedOptionIndex = currentUser != null
+        ? poll.getSelectedOptionIndex(currentUser.uid)
+        : null;
 
     return Card(
       elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.start,
           children: [
+            // Poll status header
             Row(
               children: [
                 Container(
@@ -365,7 +411,6 @@ class PollsTab extends StatelessWidget {
                     color: poll.isActive ? Colors.green : Colors.grey,
                   ),
                 ),
-                const SizedBox(width: 8),
                 Text(
                   poll.isActive ? 'ACTIVE' : 'CLOSED',
                   style: theme.textTheme.labelSmall?.copyWith(
@@ -374,7 +419,7 @@ class PollsTab extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
-                const Icon(Icons.poll_outlined, color: Colors.purple),
+                const Icon(Icons.poll_outlined, color: Colors.purple, size: 20),
                 const SizedBox(width: 8),
                 Text(
                   'POLL',
@@ -386,6 +431,8 @@ class PollsTab extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+
+            // Poll question
             Text(
               poll.question,
               style: TextStyle(
@@ -394,10 +441,16 @@ class PollsTab extends StatelessWidget {
                     ? Colors.white
                     : Colors.black,
                 fontSize: 18,
+                letterSpacing: 1,
+                height: 1.2,
               ),
             ),
             const SizedBox(height: 16),
+
+            // Poll options
             ...poll.options.map((option) {
+              final isSelected = hasVoted &&
+                  selectedOptionIndex == poll.options.indexOf(option);
               final percentage = canShowResults && totalVotes > 0
                   ? (option.votes / totalVotes * 100).round()
                   : 0;
@@ -413,10 +466,11 @@ class PollsTab extends StatelessWidget {
                                   .vote(poll.id, poll.options.indexOf(option));
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                    content: Text('Vote submitted!',
-                                        style: TextStyle(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.bold))),
+                                  content: Text('Vote submitted!',
+                                      style: TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold)),
+                                ),
                               );
                             } catch (e) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -426,48 +480,56 @@ class PollsTab extends StatelessWidget {
                           },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        vertical: 12,
-                        horizontal: 16,
-                      ),
+                          vertical: 12, horizontal: 16),
                       margin: const EdgeInsets.only(bottom: 8),
                       decoration: BoxDecoration(
-                        color: hasVoted
-                            ? Colors.grey.withOpacity(0.1)
-                            : Colors.purple.withOpacity(0.1),
+                        color: isSelected
+                            ? Colors.purple.withOpacity(
+                                0.5) // Seçilen seçenek - daha koyu mor
+                            : hasVoted
+                                ? Colors.purple.withOpacity(
+                                    0.1) // Diğer seçenekler - açık mor
+                                : poll.isActive
+                                    ? Colors.white
+                                    : Colors.grey[200],
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: hasVoted
-                              ? Colors.grey.withOpacity(0.3)
-                              : Colors.purple.withOpacity(0.3),
-                          width: 1,
+                          color: isSelected
+                              ? Colors.purple // Seçilen seçenek border rengi
+                              : hasVoted
+                                  ? Colors.grey.withOpacity(0.3)
+                                  : Colors.grey.withOpacity(0.3),
+                          width: isSelected
+                              ? 2
+                              : 1, // Seçilen seçenekte daha kalın border
                         ),
-                        boxShadow: hasVoted
-                            ? []
-                            : [
+                        boxShadow: isSelected
+                            ? [
                                 BoxShadow(
-                                  color: Colors.purple.withOpacity(0.2),
-                                  blurRadius: 4,
+                                  color: Colors.purple.withOpacity(0.3),
+                                  blurRadius: 8,
+                                  spreadRadius: 1,
                                   offset: const Offset(0, 2),
-                                ),
-                              ],
+                                )
+                              ]
+                            : [],
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           Expanded(
                             child: Text(
                               option.text,
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: hasVoted || !poll.isActive
-                                    ? Colors.grey
-                                    : Colors.purple,
+                                color: isSelected
+                                    ? Colors
+                                        .white // Seçilen seçenekte beyaz yazı
+                                    : hasVoted || !poll.isActive
+                                        ? Colors.grey[600]
+                                        : Colors.grey[800],
                                 fontSize: 16,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.start,
                             ),
                           ),
                           if (canShowResults)
@@ -476,7 +538,6 @@ class PollsTab extends StatelessWidget {
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: Colors.purple,
-                                fontSize: 16,
                               ),
                             ),
                         ],
@@ -488,21 +549,18 @@ class PollsTab extends StatelessWidget {
                     LinearProgressIndicator(
                       value: totalVotes > 0 ? option.votes / totalVotes : 0,
                       backgroundColor: Colors.grey[200],
-                      color: hasVoted
-                          ? Colors.grey.withOpacity(0.3)
-                          : Colors.purple.withOpacity(0.3),
-                      valueColor:
-                          const AlwaysStoppedAnimation<Color>(Colors.purple),
+                      color: isSelected
+                          ? Colors.purple
+                          : Colors.purple.withOpacity(0.5),
                       minHeight: 4,
-                      semanticsLabel: '${option.text} progress',
-                      semanticsValue: '$percentage%',
                     ),
                     const SizedBox(height: 8),
                   ],
                 ],
               );
             }),
-            const SizedBox(height: 8),
+
+            // Poll footer info
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -512,17 +570,7 @@ class PollsTab extends StatelessWidget {
                   color: hasVoted
                       ? Colors.grey.withOpacity(0.3)
                       : Colors.purple.withOpacity(0.3),
-                  width: 1,
                 ),
-                boxShadow: hasVoted
-                    ? []
-                    : [
-                        BoxShadow(
-                          color: Colors.purple.withOpacity(0.2),
-                          blurRadius: 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
               ),
               child: Row(
                 children: [
@@ -542,10 +590,11 @@ class PollsTab extends StatelessWidget {
                               ? 'Select an option to vote'
                               : 'This poll is closed',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: hasVoted ? Colors.green : Colors.purple,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1,
+                        color: hasVoted
+                            ? Colors.green
+                            : Theme.of(context).brightness == Brightness.dark
+                                ? Colors.white70
+                                : Colors.purple[800],
                       ),
                     ),
                   ),

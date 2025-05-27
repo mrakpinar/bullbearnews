@@ -14,7 +14,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedIndex = 2;
+  int _selectedIndex = 3;
   late final PageController _pageController;
   late AnimationController _animationController;
 
@@ -150,7 +150,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 isSelected ? iconFilled : iconOutlined,
                 size: isSelected ? 30 : 24,
                 color: isSelected
-                    ? Colors.white
+                    ? isDarkMode
+                        ? Colors.white
+                        : primaryColor
                     : isDarkMode
                         ? Colors.grey[400]
                         : Colors.grey[600],

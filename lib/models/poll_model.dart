@@ -7,7 +7,9 @@ class Poll {
   final Timestamp createdAt;
   final bool isActive;
   final String createdBy;
-  final List<String> votedUserIds; // Yeni eklenen alan
+  final List<String> votedUserIds;
+  final Map<String, int>
+      userVotes; // Kullanıcı ID'si -> Seçilen seçenek indeksi
 
   bool canShowResults(String userId) {
     return votedUserIds.contains(userId);
@@ -21,6 +23,7 @@ class Poll {
     required this.isActive,
     required this.createdBy,
     required this.votedUserIds,
+    required this.userVotes,
   });
 
   factory Poll.fromMap(String id, Map<String, dynamic> map) {
@@ -31,15 +34,20 @@ class Poll {
               ?.map((opt) => PollOption.fromMap(opt))
               .toList() ??
           [],
-      createdAt: (map['createdAt'] as Timestamp),
+      createdAt: map['createdAt'] as Timestamp,
       isActive: map['isActive'] ?? false,
       createdBy: map['createdBy'] ?? '',
       votedUserIds: List<String>.from(map['votedUserIds'] ?? []),
+      userVotes: Map<String, int>.from(map['userVotes'] ?? {}),
     );
   }
 
   bool hasUserVoted(String userId) {
     return votedUserIds.contains(userId);
+  }
+
+  int? getSelectedOptionIndex(String userId) {
+    return userVotes[userId];
   }
 }
 

@@ -3,16 +3,19 @@ import 'package:bullbearnews/screens/profile/edit_asset_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:share_plus/share_plus.dart';
 import 'add_to_wallet_screen.dart';
 
 class WalletDetailScreen extends StatefulWidget {
   final Wallet wallet;
+  final bool isSharedView;
   final Function() onUpdate;
 
   const WalletDetailScreen({
     super.key,
     required this.wallet,
     required this.onUpdate,
+    this.isSharedView = false,
   });
 
   @override
@@ -28,6 +31,78 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
   void initState() {
     super.initState();
     _wallet = widget.wallet;
+    if (!widget.isSharedView) {
+      _incrementViewCount();
+    }
+  }
+
+  Future<void> _incrementViewCount() async {
+    try {
+      await _firestore
+          .collection('users')
+          .doc(_auth.currentUser!.uid)
+          .collection('sharedPortfolios')
+          .doc(_wallet.id)
+          .update({
+        'viewCount': FieldValue.increment(1),
+      });
+    } catch (e) {
+      debugPrint('Error incrementing view count: $e');
+    }
+  }
+
+  Future<void> _shareWallet() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Paylaşım bilgisini Firestore'a kaydet
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('sharedPortfolios')
+          .doc(_wallet.id)
+          .set({
+        'walletId': _wallet.id,
+        'sharedAt': FieldValue.serverTimestamp(),
+        'isPublic': true,
+        'viewCount': 0,
+        'likes': [],
+      }, SetOptions(merge: true));
+
+      // Paylaşılabilir link oluştur
+      final shareLink =
+          'https://yourapp.com/portfolio/${user.uid}/${_wallet.id}';
+      final shareText = 'Check out my crypto portfolio: $shareLink';
+
+      // Paylaşım dialogu göster
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Portfolio Shared'),
+          content: const Text('Your portfolio has been shared successfully!'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await Share.share(shareText);
+              },
+              child: const Text('Share Link'),
+            ),
+          ],
+        ),
+      );
+
+      widget.onUpdate();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error sharing portfolio: $e')),
+      );
+    }
   }
 
   Future<void> _addToWallet() async {
@@ -35,7 +110,7 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddToWalletScreen(),
-        settings: RouteSettings(arguments: _wallet.id), // Wallet ID'sini geç
+        settings: RouteSettings(arguments: _wallet.id),
       ),
     );
 
@@ -75,7 +150,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
           item: item,
           onSave: (updatedItem) async {
             try {
-              // Önce local state'i güncelle
               final updatedItems = _wallet.items
                   .map((i) => i.id == updatedItem.id ? updatedItem : i)
                   .toList();
@@ -84,7 +158,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                 _wallet = _wallet.copyWith(items: updatedItems);
               });
 
-              // Sonra Firestore'u güncelle
               await _firestore
                   .collection('users')
                   .doc(_auth.currentUser!.uid)
@@ -94,9 +167,7 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                 'items': updatedItems.map((e) => e.toJson()).toList(),
               });
 
-              // Parent widget'ı bilgilendir
               widget.onUpdate();
-
               return updatedItem;
             } catch (e) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -113,7 +184,7 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
     );
 
     if (updatedItem != null) {
-      await _loadWallet(); // Verileri yeniden yükle
+      await _loadWallet();
     }
   }
 
@@ -128,54 +199,61 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_sharp, size: 30),
-            tooltip: 'Add Asset',
-            onPressed: _addToWallet,
-          ),
-          IconButton(
-            icon: Icon(Icons.delete, color: Colors.red[500], size: 30),
-            tooltip: 'Delete Wallet',
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete Wallet'),
-                  content: const Text(
-                      'Are you sure you want to delete this wallet? This action cannot be undone.'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Delete',
-                          style: TextStyle(color: Colors.red)),
-                    ),
-                  ],
-                ),
-              );
-              if (confirm == true) {
-                try {
-                  final user = _auth.currentUser;
-                  if (user == null) throw Exception('User not logged in');
-                  await _firestore
-                      .collection('users')
-                      .doc(user.uid)
-                      .collection('wallets')
-                      .doc(_wallet.id)
-                      .delete();
-                  widget.onUpdate();
-                  Navigator.of(context).pop();
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error deleting wallet: $e')),
-                  );
+          if (!widget.isSharedView) ...[
+            IconButton(
+              icon: const Icon(Icons.add_circle_outline_sharp, size: 30),
+              tooltip: 'Add Asset',
+              onPressed: _addToWallet,
+            ),
+            IconButton(
+              icon: const Icon(Icons.share, size: 30),
+              tooltip: 'Share Portfolio',
+              onPressed: _shareWallet,
+            ),
+            IconButton(
+              icon: Icon(Icons.delete, color: Colors.red[500], size: 30),
+              tooltip: 'Delete Wallet',
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Delete Wallet'),
+                    content: const Text(
+                        'Are you sure you want to delete this wallet? This action cannot be undone.'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: const Text('Delete',
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  try {
+                    final user = _auth.currentUser;
+                    if (user == null) throw Exception('User not logged in');
+                    await _firestore
+                        .collection('users')
+                        .doc(user.uid)
+                        .collection('wallets')
+                        .doc(_wallet.id)
+                        .delete();
+                    widget.onUpdate();
+                    Navigator.of(context).pop();
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error deleting wallet: $e')),
+                    );
+                  }
                 }
-              }
-            },
-          ),
+              },
+            ),
+          ],
         ],
       ),
       body: _wallet.items.isEmpty
@@ -215,7 +293,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                     },
                     onDismissed: (direction) async {
                       try {
-                        // Önce local state'i güncelle
                         final removedItem = _wallet.items[index];
                         final updatedItems =
                             List<WalletItem>.from(_wallet.items);
@@ -225,7 +302,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                           _wallet = _wallet.copyWith(items: updatedItems);
                         });
 
-                        // Sonra Firestore'u güncelle
                         await _firestore
                             .collection('users')
                             .doc(_auth.currentUser!.uid)
@@ -235,10 +311,8 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                           'items': updatedItems.map((e) => e.toJson()).toList(),
                         });
 
-                        // Parent widget'ı bilgilendir
                         widget.onUpdate();
 
-                        // Başarı mesajı göster
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
@@ -249,7 +323,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
                           );
                         }
                       } catch (e) {
-                        // Hata durumunda wallet'ı yeniden yükle
                         await _loadWallet();
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -357,7 +430,7 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
           fontWeight: FontWeight.bold,
         ),
       ),
-      onTap: () => _editAsset(item), // Bu satırı ekleyin
+      onTap: () => _editAsset(item),
     );
   }
 }

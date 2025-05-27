@@ -150,6 +150,8 @@ class _NewsCardState extends State<NewsCard> {
                             : Colors.black,
                         letterSpacing: 2,
                         wordSpacing: 2,
+                        fontFamily: 'Arial',
+                        fontStyle: FontStyle.normal,
                       ),
                     ),
 
@@ -163,10 +165,21 @@ class _NewsCardState extends State<NewsCard> {
                         fontSize: 14,
                         height: 1.4,
                         fontWeight: FontWeight.w400,
+                        letterSpacing: 0.5,
+                        wordSpacing: 0.5,
+                        fontFamily: 'Arial',
+                        fontStyle: FontStyle.normal,
                       ),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.justify,
+                      textDirection: TextDirection.ltr,
+                      textScaleFactor: 1.0,
+                      textHeightBehavior: TextHeightBehavior(
+                        applyHeightToFirstAscent: true,
+                        applyHeightToLastDescent: true,
+                      ),
+                      semanticsLabel: 'News content',
                     ),
 
                     SizedBox(height: 12),
@@ -189,7 +202,17 @@ class _NewsCardState extends State<NewsCard> {
                                   : Colors.black,
                             ),
                             SizedBox(width: 4),
-                            Text(widget.news.author),
+                            Text(widget.news.author,
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w400,
+                                  letterSpacing: 0.5,
+                                  wordSpacing: 0.5,
+                                  fontFamily: 'Arial',
+                                  fontStyle: FontStyle.normal,
+                                  height: 1.2,
+                                )),
                           ],
                         ),
                         Row(
@@ -243,10 +266,13 @@ class _NewsCardState extends State<NewsCard> {
       builder: (context, snapshot) {
         final isSaved = snapshot.data ?? false;
         return IconButton(
-          icon: Icon(isSaved ? Icons.bookmark : Icons.bookmark_border,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Colors.black),
+          icon: Icon(
+            isSaved ? Icons.bookmark : Icons.bookmark_border,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.white
+                : Colors.black,
+            size: 24,
+          ),
           onPressed: _toggleSave,
         );
       },
@@ -259,12 +285,26 @@ class _NewsCardState extends State<NewsCard> {
       if (isSaved) {
         await LocalStorageService.removeNews(widget.news.id);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Removed from saved')),
+          const SnackBar(
+              content: Text(
+            'Removed from saved',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.red,
+            ),
+          )),
         );
       } else {
         await LocalStorageService.saveNews(widget.news);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Added to saved')),
+          const SnackBar(
+              content: Text(
+            'Added to saved',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.green,
+            ),
+          )),
         );
       }
       if (mounted) setState(() {});

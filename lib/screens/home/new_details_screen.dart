@@ -111,6 +111,17 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                         Brightness.dark
                                     ? Colors.white
                                     : Colors.black, // Başlık rengi
+                                shadows: [
+                                  Shadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    offset: Offset(2, 2),
+                                    blurRadius: 4,
+                                  ),
+                                ],
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: 1.5,
+                                wordSpacing: 1.5,
+                                fontFamily: 'Georgia',
                               ),
                             ),
                             SizedBox(height: 16),
@@ -159,11 +170,15 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.normal,
-                                height: 1.6,
                                 color: Theme.of(context).brightness ==
                                         Brightness.dark
                                     ? Colors.white
                                     : Colors.black, // İçerik rengi
+                                height: 1.6,
+                                letterSpacing: 0.5,
+                                wordSpacing: 0.5,
+                                fontFamily: 'Arial',
+                                fontStyle: FontStyle.normal,
                               ),
                             ),
                             SizedBox(height: 32),

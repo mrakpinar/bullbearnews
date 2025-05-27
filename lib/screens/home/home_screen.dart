@@ -69,6 +69,19 @@ class _HomeScreenState extends State<HomeScreen> {
             color: Theme.of(context).brightness == Brightness.dark
                 ? Colors.white
                 : Colors.black,
+            fontFamily: 'RobotoMono',
+            letterSpacing: 1.2,
+            wordSpacing: 1.2,
+            height: 1.5,
+            shadows: [
+              Shadow(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.black54
+                    : Colors.grey[600]!,
+                offset: Offset(1, 1),
+                blurRadius: 2,
+              ),
+            ],
           ),
           textAlign: TextAlign.center,
           maxLines: 1,
@@ -125,16 +138,19 @@ class _HomeScreenState extends State<HomeScreen> {
               strokeWidth: 2,
               backgroundColor: Theme.of(context).colorScheme.background,
             ))
-          : RefreshIndicator(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              backgroundColor: Theme.of(context).colorScheme.background,
-              onRefresh: _loadNews,
-              child: ListView.builder(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                itemCount: _allNews.length,
-                itemBuilder: (context, index) {
-                  return NewsCard(news: _allNews[index]);
-                },
+          : Padding(
+              padding: const EdgeInsets.only(bottom: 100.0),
+              child: RefreshIndicator(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                backgroundColor: Theme.of(context).colorScheme.background,
+                onRefresh: _loadNews,
+                child: ListView.builder(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: _allNews.length,
+                  itemBuilder: (context, index) {
+                    return NewsCard(news: _allNews[index]);
+                  },
+                ),
               ),
             ),
     );
