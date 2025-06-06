@@ -22,7 +22,7 @@ class _NewsCardState extends State<NewsCard> {
       padding: EdgeInsets.all(0),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: Theme.of(context).cardTheme.color,
         border: Border.all(
           color: Theme.of(context).colorScheme.primaryContainer,
           width: 0.5,
@@ -48,7 +48,7 @@ class _NewsCardState extends State<NewsCard> {
               color: Theme.of(context).colorScheme.primaryContainer,
               width: 0.5,
             ),
-            color: Theme.of(context).cardColor,
+            color: Theme.of(context).cardTheme.color,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
@@ -161,7 +161,7 @@ class _NewsCardState extends State<NewsCard> {
                     Text(
                       widget.news.content,
                       style: TextStyle(
-                        color: Colors.grey[700],
+                        color: Theme.of(context).colorScheme.onSecondary,
                         fontSize: 14,
                         height: 1.4,
                         fontWeight: FontWeight.w400,

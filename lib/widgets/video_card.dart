@@ -13,9 +13,7 @@ class VideoCard extends StatelessWidget {
       margin: EdgeInsets.only(bottom: 16),
       elevation: 3,
       shadowColor: Colors.black.withOpacity(0.2),
-      color: Theme.of(context).brightness == Brightness.light
-          ? Colors.white
-          : Colors.black,
+      color: Theme.of(context).cardTheme.color,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
@@ -100,9 +98,7 @@ class VideoCard extends StatelessWidget {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? Colors.black
-                          : Colors.white,
+                      color: Theme.of(context).colorScheme.onSecondary,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -112,9 +108,7 @@ class VideoCard extends StatelessWidget {
                     Text(
                       video.description,
                       style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.light
-                            ? Colors.black.withOpacity(0.7)
-                            : Colors.white.withOpacity(0.7),
+                        color: Theme.of(context).colorScheme.onSecondary,
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                       ),

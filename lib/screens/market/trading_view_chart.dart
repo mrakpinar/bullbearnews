@@ -9,8 +9,8 @@ class TradingViewChart extends StatefulWidget {
   const TradingViewChart({
     super.key,
     required this.symbol,
-    this.height = 450, // Yüksekliği artırdık
-    this.theme = 'dark', // Tema seçeneği ekledik (dark/light)
+    this.height = 350, // Yüksekliği artırdık
+    this.theme = 'dark',
   });
 
   @override
@@ -25,16 +25,25 @@ class _TradingViewChartState extends State<TradingViewChart> {
   @override
   void initState() {
     super.initState();
-    _initializeController();
-  }
-
-  void _initializeController() {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(
+        widget.theme == 'dark' ? const Color(0xFF1E222D) : Colors.white,
+      )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (String url) {
-            setState(() => _isLoading = false);
+          onPageFinished: (url) {
+            if (mounted) {
+              setState(() => _isLoading = false);
+              // Grafik yüklendikten sonra boyutlandırmayı yeniden ayarla
+              _controller.runJavaScript('''
+                setTimeout(function() {
+                  if (window.tvWidget) {
+                    window.tvWidget.resize();
+                  }
+                }, 1000);
+              ''');
+            }
           },
         ),
       )
@@ -42,25 +51,47 @@ class _TradingViewChartState extends State<TradingViewChart> {
   }
 
   String _buildHtmlContent() {
+    final symbol = widget.symbol.toUpperCase();
     return '''
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>TradingView</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+        <title>TradingView Chart</title>
         <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
         <style>
-          body { margin: 0; padding: 0; background: ${widget.theme == 'dark' ? '#1E222D' : '#fff'}; }
-          #tradingview { height: 100vh; width: 100vw; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          html, body {
+            height: 100%;
+            width: 100%;
+            background: ${widget.theme == 'dark' ? '#1E222D' : '#ffffff'};
+            overflow: hidden;
+          }
+          #tradingview_container {
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+          }
+          #tradingview {
+            height: 100%;
+            width: 100%;
+          }
         </style>
       </head>
       <body>
-        <div id="tradingview"></div>
-        <script type="text/javascript">
-          new TradingView.widget({
-            "autosize": true,
-            "symbol": "BINANCE:${widget.symbol.toUpperCase()}USDT",
+        <div id="tradingview_container">
+          <div id="tradingview"></div>
+        </div>
+        <script>
+          window.tvWidget = new TradingView.widget({
+            "width": "100%",
+            "height": "100%",
+            "symbol": "BINANCE:${symbol}USDT",
             "interval": "D",
             "timezone": "Etc/UTC",
             "theme": "${widget.theme}",
@@ -68,31 +99,35 @@ class _TradingViewChartState extends State<TradingViewChart> {
             "locale": "en",
             "toolbar_bg": "${widget.theme == 'dark' ? '#1E222D' : '#f1f3f6'}",
             "enable_publishing": false,
-            "withdateranges": true,
-            "hide_side_toolbar": false,
-            "allow_symbol_change": true,
-            "details": true,
-            "hotlist": true,
-            "calendar": true,
-
+            "allow_symbol_change": false,
             "container_id": "tradingview",
-            "show_popup_button": true,
-            "popup_width": "1000",
-            "popup_height": "650",
+            "autosize": true,
+            "hide_top_toolbar": false,
+            "hide_legend": false,
+            "save_image": false,
+            "hide_volume": false,
+            "support_host": "https://www.tradingview.com"
+          });
+          
+          // Pencere boyutu değiştiğinde grafik boyutunu ayarla
+          window.addEventListener('resize', function() {
+            if (window.tvWidget) {
+              window.tvWidget.resize();
+            }
+          });
+          
+          // Grafik yüklendiğinde boyutu ayarla
+          window.addEventListener('load', function() {
+            setTimeout(function() {
+              if (window.tvWidget) {
+                window.tvWidget.resize();
+              }
+            }, 500);
           });
         </script>
       </body>
       </html>
     ''';
-  }
-  // "studies": ["RSI@tv-basicstudies","MACD@tv-basicstudies"],
-
-  void _toggleFullScreen() {
-    setState(() {
-      _isLoading = true;
-      _isFullScreen = !_isFullScreen;
-      _initializeController();
-    });
   }
 
   @override
@@ -101,33 +136,56 @@ class _TradingViewChartState extends State<TradingViewChart> {
   }
 
   Widget _buildNormalChart() {
-    return Stack(
-      children: [
-        Container(
-          height: widget.height,
-          decoration: BoxDecoration(
-            color:
-                widget.theme == 'dark' ? const Color(0xFF1E222D) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: Column(
-              children: [
-                _buildChartHeader(),
-                Expanded(
-                  child: WebViewWidget(controller: _controller),
-                ),
-              ],
+    return Container(
+      height: widget.height,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: widget.theme == 'dark' ? const Color(0xFF1E222D) : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: WebViewWidget(controller: _controller),
             ),
-          ),
+            if (_isLoading)
+              Container(
+                color: widget.theme == 'dark'
+                    ? const Color(0xFF1E222D)
+                    : Colors.white,
+                child: const Center(
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            // Tam ekran butonu
+            Positioned(
+              top: 8,
+              right: 8,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.fullscreen,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  onPressed: () => setState(() => _isFullScreen = true),
+                  padding: const EdgeInsets.all(4),
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        if (_isLoading)
-          SizedBox(
-            height: widget.height,
-            child: const Center(child: CircularProgressIndicator()),
-          ),
-      ],
+      ),
     );
   }
 
@@ -136,60 +194,38 @@ class _TradingViewChartState extends State<TradingViewChart> {
       backgroundColor:
           widget.theme == 'dark' ? const Color(0xFF1E222D) : Colors.white,
       appBar: AppBar(
+        title: Text('${widget.symbol.toUpperCase()} Chart'),
         backgroundColor:
             widget.theme == 'dark' ? const Color(0xFF1E222D) : Colors.white,
         foregroundColor: widget.theme == 'dark' ? Colors.white : Colors.black,
-        title: Text('${widget.symbol.toUpperCase()} Chart'),
         actions: [
           IconButton(
             icon: const Icon(Icons.fullscreen_exit),
-            onPressed: _toggleFullScreen,
+            onPressed: () => setState(() => _isFullScreen = false),
           ),
         ],
       ),
       body: Stack(
         children: [
-          WebViewWidget(controller: _controller),
-          if (_isLoading) const Center(child: CircularProgressIndicator()),
+          Positioned.fill(
+            child: WebViewWidget(controller: _controller),
+          ),
+          if (_isLoading)
+            Container(
+              color: widget.theme == 'dark'
+                  ? const Color(0xFF1E222D)
+                  : Colors.white,
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _buildChartHeader() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            '${widget.symbol.toUpperCase()} Chart',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: widget.theme == 'dark' ? Colors.white : Colors.black,
-            ),
-          ),
-          Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  widget.theme == 'dark' ? Icons.light_mode : Icons.dark_mode,
-                  size: 20,
-                  color: widget.theme == 'dark' ? Colors.white : Colors.black,
-                ),
-                onPressed: () {
-                  // Tema değişimi burada uygulanabilir
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.fullscreen, size: 20),
-                color: widget.theme == 'dark' ? Colors.white : Colors.black,
-                onPressed: _toggleFullScreen,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+  @override
+  void dispose() {
+    super.dispose();
   }
 }

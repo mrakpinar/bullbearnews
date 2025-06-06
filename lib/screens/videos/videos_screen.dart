@@ -10,7 +10,8 @@ class VideosScreen extends StatefulWidget {
   _VideosScreenState createState() => _VideosScreenState();
 }
 
-class _VideosScreenState extends State<VideosScreen> {
+class _VideosScreenState extends State<VideosScreen>
+    with AutomaticKeepAliveClientMixin {
   final VideoService _videoService = VideoService();
   List<VideoModel> _allVideos = [];
   final List<String> _categories = [
@@ -23,25 +24,68 @@ class _VideosScreenState extends State<VideosScreen> {
   final String _selectedCategory = 'All';
   bool _isLoading = true;
 
+  // Sayfalama için
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  static const int _itemsPerPage = 10;
+  bool _hasMore = true;
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
     _loadVideos();
+    _scrollController.addListener(_onScroll);
   }
 
-  Future<void> _loadVideos() async {
-    if (mounted) {
-      setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreVideos();
+    }
+  }
+
+  Future<void> _loadVideos({bool refresh = false}) async {
+    if (!mounted) return;
+
+    if (refresh) {
+      _currentPage = 1;
+      _hasMore = true;
+      _allVideos.clear();
     }
 
+    setState(() => _isLoading = true);
+
     try {
+      List<VideoModel> newVideos;
       if (_selectedCategory == 'All') {
-        _allVideos = await _videoService.getVideos();
+        newVideos = await _videoService.getVideos();
       } else {
-        _allVideos = await _videoService.getVideosByCategory(_selectedCategory);
+        newVideos = await _videoService.getVideosByCategory(
+          _selectedCategory,
+        );
+      }
+
+      if (mounted) {
+        setState(() {
+          if (refresh) {
+            _allVideos = newVideos;
+          } else {
+            _allVideos.addAll(newVideos);
+          }
+          _hasMore = newVideos.length == _itemsPerPage;
+        });
       }
     } catch (e) {
-      print('Video yükleme hatası: $e');
+      debugPrint('Video yükleme hatası: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -49,58 +93,72 @@ class _VideosScreenState extends State<VideosScreen> {
     }
   }
 
+  Future<void> _loadMoreVideos() async {
+    if (_isLoading || !_hasMore) return;
+
+    _currentPage++;
+    await _loadVideos();
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Videos',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            color: Theme.of(context).brightness == Brightness.light
-                ? Colors.black
-                : Colors.white,
-          ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    if (_isLoading && _allVideos.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_allVideos.isEmpty) {
+      return const Center(
+        child: Text(
+          'No videos available',
+          style: TextStyle(fontSize: 16),
         ),
-        elevation: 0,
-        centerTitle: true,
+      );
+    }
+
+    return SafeArea(
+      child: RefreshIndicator(
+        color: Theme.of(context).primaryColor,
+        backgroundColor: Theme.of(context).brightness == Brightness.light
+            ? Colors.white
+            : Colors.black,
+        onRefresh: () => _loadVideos(refresh: true),
+        child: _buildVideoList(),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _allVideos.isEmpty
-              ? Center(
-                  child: Text(
-                    'No videos available',
-                    style: TextStyle(fontSize: 16),
-                  ),
+    );
+  }
+
+  Widget _buildVideoList() {
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+      itemCount: _allVideos.length + (_hasMore ? 1 : 0),
+      itemBuilder: (context, index) {
+        // Loading indicator at the end
+        if (index == _allVideos.length) {
+          return _hasMore
+              ? const Padding(
+                  padding: EdgeInsets.all(16.0),
+                  child: Center(child: CircularProgressIndicator()),
                 )
-              : RefreshIndicator(
-                  color: Theme.of(context).primaryColor,
-                  backgroundColor:
-                      Theme.of(context).brightness == Brightness.light
-                          ? Colors.white
-                          : Colors.black,
-                  onRefresh: _loadVideos,
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    padding: EdgeInsets.all(16),
-                    itemCount: _allVideos.length,
-                    itemBuilder: (context, index) {
-                      if (index == _allVideos.length - 1) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: VideoCard(video: _allVideos[index]),
-                        );
-                      }
-                      return Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: index == _allVideos.length - 1
-                              ? VideoCard(video: _allVideos[index])
-                              : VideoCard(video: _allVideos[index]));
-                    },
-                  ),
-                ),
+              : const SizedBox.shrink();
+        }
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: VideoCard(
+            video: _allVideos[index],
+            key: ValueKey(_allVideos[index].videoID),
+          ),
+        );
+      },
     );
   }
 }

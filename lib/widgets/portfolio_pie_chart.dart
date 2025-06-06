@@ -79,7 +79,10 @@ class PortfolioPieChart extends StatelessWidget {
         height: 200,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          color: Theme.of(context).cardColor,
+          color: Theme.of(context).cardTheme.color,
+          border: Border.all(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.2),
+          ),
         ),
         child: Center(
           child: Text(

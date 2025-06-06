@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:bullbearnews/screens/profile/shown_profile_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 class SearchUserScreen extends StatefulWidget {
   const SearchUserScreen({super.key});
@@ -15,17 +17,27 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
   final TextEditingController _searchController = TextEditingController();
   List<DocumentSnapshot> _searchResults = [];
   bool _isLoading = false;
+  Timer? _debounceTimer;
+
+  final Map<String, List<DocumentSnapshot>> _searchCache = {};
 
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      final query = _searchController.text.trim();
-      if (query.isNotEmpty) {
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  void _onSearchChanged() {
+    // Debounce mekanizması
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      final query = _searchController.text.trim().toLowerCase();
+      if (query.isNotEmpty && query.length >= 2) {
         _searchUsers(query);
       } else {
         setState(() {
-          _searchResults.clear(); // Arama kutusu boşsa sonuçları temizle
+          _searchResults.clear();
         });
       }
     });
@@ -33,30 +45,54 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
 
   @override
   void dispose() {
+    _debounceTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _searchUsers(String query) async {
-    if (query.isEmpty) return; // Boş sorgu göndermeyi engelle
+    if (query.isEmpty || query.length < 2) return;
+
+    // Cache kontrolü
+    if (_searchCache.containsKey(query)) {
+      setState(() {
+        _searchResults = _searchCache[query]!;
+        _isLoading = false;
+      });
+      return;
+    }
 
     setState(() => _isLoading = true);
 
-    // Firestore'da kullanıcıları arama
-    // 'nickname' alanına göre filtreleme yapıyoruz
+    try {
+      final result = await FirebaseFirestore.instance
+          .collection('users')
+          .where('nickname', isGreaterThanOrEqualTo: query)
+          .where('nickname', isLessThan: '${query}z')
+          .limit(20) // Sonuç limitini ekle
+          .get();
 
-    final result = await FirebaseFirestore.instance
-        .collection('users')
-        .where('nickname', isGreaterThanOrEqualTo: query.toLowerCase())
-        .where('nickname', isLessThan: '${query.toLowerCase()}z')
-        .get();
-
-    setState(() {
-      _searchResults = result.docs
+      final filteredResults = result.docs
           .where((doc) => doc.id != FirebaseAuth.instance.currentUser!.uid)
           .toList();
-      _isLoading = false;
-    });
+
+      // Cache'e kaydet
+      _searchCache[query] = filteredResults;
+
+      if (mounted) {
+        setState(() {
+          _searchResults = filteredResults;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Arama hatası: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -74,24 +110,13 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // TextField optimizasyonları
             TextField(
               controller: _searchController,
               textInputAction: TextInputAction.search,
               style: const TextStyle(fontSize: 16),
-              cursorColor: Theme.of(context).colorScheme.primary,
-              cursorHeight: 20,
-              cursorWidth: 2,
-              autocorrect: false,
-              enableSuggestions: false,
-              textCapitalization: TextCapitalization.words,
-              keyboardType: TextInputType.text,
-              maxLengthEnforcement: MaxLengthEnforcement.enforced,
-              textAlignVertical: TextAlignVertical.center,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-              ],
               decoration: InputDecoration(
-                hintText: 'User name...',
+                hintText: 'User name (min 2 characters)...',
                 filled: true,
                 fillColor: Theme.of(context)
                     .colorScheme
@@ -101,143 +126,77 @@ class _SearchUserScreenState extends State<SearchUserScreen> {
                   borderRadius: BorderRadius.circular(8),
                   borderSide: BorderSide.none,
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
                 contentPadding:
                     const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
                 prefixIcon: const Icon(Icons.search),
-                suffixIconConstraints: const BoxConstraints(
-                  minWidth: 0,
-                  minHeight: 0,
-                ),
-                suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
-                  onPressed: () {
-                    final query = _searchController.text.trim();
-
-                    if (query.isNotEmpty) {
-                      _searchUsers(query);
-                    } else {
-                      setState(() {
-                        _searchResults
-                            .clear(); // Arama kutusu boşsa sonuçları temizle
-                      });
-                    }
-                  },
-                ),
               ),
-              onChanged: (val) {
-                if (val.trim().isNotEmpty) {
-                  _searchUsers(val.trim());
-                } else if (val.trim().isEmpty) {
-                  setState(() {
-                    _searchResults
-                        .clear(); // Arama kutusu boşsa sonuçları temizle
-                  });
-                } else if (val.trim().length < 3) {
-                  setState(() {
-                    _searchResults
-                        .clear(); // Arama kutusu boşsa sonuçları temizle
-                  });
-                } else if (val.trim().length > 20) {
-                  setState(() {
-                    _searchResults
-                        .clear(); // Arama kutusu boşsa sonuçları temizle
-                  });
-                } else {
-                  setState(() {
-                    _searchResults
-                        .clear(); // Arama kutusu boşsa sonuçları temizle
-                  });
-                }
-              },
-              onTap: () {
-                if (_searchController.text.trim().isNotEmpty) {
-                  _searchUsers(_searchController.text.trim());
-                }
-              },
-              onSubmitted: (val) {
-                if (val.trim().isNotEmpty) {
-                  _searchUsers(val.trim());
-                }
-              },
+              // onChanged ve diğer callback'leri kaldır, sadece listener kullan
             ),
             const SizedBox(height: 20),
-            _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : Expanded(
-                    child: ListView.builder(
-                      itemCount: _searchResults.length,
-                      itemBuilder: (context, index) {
-                        if (index >= _searchResults.length) {
-                          return const SizedBox.shrink();
-                        }
-                        if (_searchResults.isEmpty) {
-                          return const Center(
-                            child: Text(
-                              'No users found',
-                              style: TextStyle(fontSize: 18),
-                            ),
-                          );
-                        }
-                        // Kullanıcıyı listele
-                        final user = _searchResults[index];
-                        if (user['nickname'] == null) {
-                          return const SizedBox.shrink();
-                        }
-                        if (user['email'] == null) {
-                          return const SizedBox.shrink();
-                        }
-                        return ListTile(
-                          leading: const CircleAvatar(
-                            child: Icon(Icons.person,
-                                size: 30, color: Colors.white),
-                          ),
-                          title: Text(
-                            user['nickname'] ?? 'Unknown',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 18),
-                          ),
-                          subtitle: Text(
-                            user['email'] ?? 'Unknown',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          trailing: const Icon(Icons.arrow_forward),
-                          contentPadding: const EdgeInsets.symmetric(
-                              vertical: 8, horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          tileColor: Theme.of(context)
-                              .colorScheme
-                              .primaryContainer
-                              .withOpacity(0.6),
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ShownProfileScreen(userId: user.id),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  ),
+            _buildSearchResults(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchResults() {
+    if (_isLoading) {
+      return const Expanded(
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (_searchResults.isEmpty && _searchController.text.trim().isNotEmpty) {
+      return const Expanded(
+        child: Center(
+          child: Text(
+            'No users found',
+            style: TextStyle(fontSize: 18),
+          ),
+        ),
+      );
+    }
+
+    return Expanded(
+      child: ListView.builder(
+        // Performans için itemExtent ekle
+        itemExtent: 80,
+        itemCount: _searchResults.length,
+        itemBuilder: (context, index) {
+          final user = _searchResults[index];
+          return _buildUserTile(user);
+        },
+      ),
+    );
+  }
+
+  Widget _buildUserTile(DocumentSnapshot user) {
+    return ListTile(
+      leading: const CircleAvatar(
+        child: Icon(Icons.person, size: 30, color: Colors.white),
+      ),
+      title: Text(
+        user['nickname'] ?? 'Unknown',
+        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+      ),
+      subtitle: Text(
+        user['email'] ?? 'Unknown',
+        style: const TextStyle(
+          fontSize: 14,
+          color: Colors.grey,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      trailing: const Icon(Icons.arrow_forward),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShownProfileScreen(userId: user.id),
+          ),
+        );
+      },
     );
   }
 }

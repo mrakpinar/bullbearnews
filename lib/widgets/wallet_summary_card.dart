@@ -41,6 +41,13 @@ class WalletSummaryCard extends StatelessWidget {
     return Column(
       children: [
         Card(
+          color: Theme.of(context).cardTheme.color,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+              color: isDarkMode ? Colors.grey[800]! : Colors.grey[300]!,
+            ),
+          ),
           elevation: 2,
           child: Padding(
             padding: const EdgeInsets.all(16.0),

@@ -221,7 +221,7 @@ class _AuthScreenState extends State<AuthScreen> {
       style: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.bold,
-        color: Theme.of(context).colorScheme.primary,
+        color: Theme.of(context).colorScheme.secondary,
       ),
     );
   }
@@ -357,7 +357,7 @@ class _AuthScreenState extends State<AuthScreen> {
         onPressed: _isLoading ? null : _submitForm,
         style: ElevatedButton.styleFrom(
           foregroundColor: Colors.white,
-          backgroundColor: Theme.of(context).colorScheme.primary,
+          backgroundColor: Theme.of(context).colorScheme.secondary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
@@ -382,7 +382,9 @@ class _AuthScreenState extends State<AuthScreen> {
       children: [
         Text(
           _isLogin ? 'Don\'t have an account?' : 'Already have an account?',
-          style: TextStyle(color: Colors.grey.shade700),
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
         ),
         TextButton(
           onPressed: _switchAuthMode,
@@ -390,7 +392,7 @@ class _AuthScreenState extends State<AuthScreen> {
             _isLogin ? 'Register' : 'Login',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
+              color: Theme.of(context).colorScheme.secondary,
             ),
           ),
         ),

@@ -1,4 +1,5 @@
 import 'package:bullbearnews/connectivity_service.dart';
+import 'package:bullbearnews/constants/colors.dart';
 import 'package:bullbearnews/models/news_model.dart';
 import 'package:bullbearnews/screens/home/home_screen.dart';
 import 'package:bullbearnews/services/local_storage_service.dart';
@@ -109,14 +110,29 @@ class _MyAppState extends State<MyApp> {
   ThemeData _buildLightTheme() {
     return ThemeData(
       brightness: Brightness.light,
-      scaffoldBackgroundColor: Colors.grey[400],
+      scaffoldBackgroundColor: AppColors.lightBackground,
       colorScheme: ColorScheme.light(
-        primary: Colors.purple[300]!,
-        secondary: Colors.purpleAccent[100]!,
-        background: Colors.grey[100]!,
-        primaryContainer: Colors.grey[400]!,
+        primary: AppColors.primary,
+        secondary: AppColors.secondary,
+        background: AppColors.lightBackground,
+        surface: AppColors.whiteText,
         onPrimary: Colors.white,
         onSecondary: Colors.black,
+        onBackground: AppColors.darkText,
+        onSurface: AppColors.darkText,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.lightCard,
+        elevation: 2,
+        margin: EdgeInsets.all(8),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      dividerTheme: DividerThemeData(
+        color: AppColors.dividerLight,
+        thickness: 1,
       ),
     );
   }
@@ -124,14 +140,29 @@ class _MyAppState extends State<MyApp> {
   ThemeData _buildDarkTheme() {
     return ThemeData.dark().copyWith(
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: Colors.grey[900],
+      scaffoldBackgroundColor: AppColors.darkBackground,
       colorScheme: ColorScheme.dark(
-        primary: Colors.purple[800]!,
-        secondary: Colors.purpleAccent[700]!,
-        background: Colors.grey[900]!,
-        primaryContainer: Colors.grey[800]!,
+        primary: AppColors.primary,
+        secondary: AppColors.secondary,
+        background: AppColors.darkBackground,
+        surface: AppColors.whiteText,
         onPrimary: Colors.white,
         onSecondary: Colors.white,
+        onBackground: AppColors.lightText,
+        onSurface: AppColors.lightText,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.darkCard,
+        elevation: 2,
+        margin: EdgeInsets.all(8),
+      ),
+      appBarTheme: AppBarTheme(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+      ),
+      dividerTheme: DividerThemeData(
+        color: AppColors.dividerDark,
+        thickness: 1,
       ),
     );
   }

@@ -11,6 +11,11 @@ class ChatService {
     return _auth.currentUser;
   }
 
+  // Yeni eklenen metod: Mesajın geçerli kullanıcıya ait olup olmadığını kontrol eder
+  bool isCurrentUser(String userId) {
+    return _auth.currentUser?.uid == userId;
+  }
+
   // Tüm sohbet odalarını getir
   Stream<List<ChatRoom>> getChatRooms() {
     return _firestore
@@ -59,7 +64,7 @@ class ChatService {
       'roomId': roomId,
       'userId': user.uid,
       'username': nickname,
-      'userProfileImage': profileImageUrl, // Profil fotoğrafı URL'si ekleniyor
+      'userProfileImage': profileImageUrl,
       'content': content,
       'timestamp': FieldValue.serverTimestamp(),
       'likes': 0,

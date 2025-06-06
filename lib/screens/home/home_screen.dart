@@ -24,23 +24,55 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   String _selectedCategory = 'All';
   bool _isLoading = true;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, List<NewsModel>> _newsCache = {};
+
+  Widget? _cachedAppBarTitle;
 
   @override
   void initState() {
     super.initState();
     _loadNews();
+    // _scrollController.addListener(() {
+    //   setState(() {});
+    // });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadNews() async {
+    // Cache kontrolü
+    if (_newsCache.containsKey(_selectedCategory)) {
+      setState(() {
+        _allNews = _newsCache[_selectedCategory]!;
+        _isLoading = false;
+      });
+      return;
+    }
+
     if (mounted) {
       setState(() => _isLoading = true);
     }
 
     try {
+      List<NewsModel> news;
       if (_selectedCategory == 'All') {
-        _allNews = await _newsService.getNews();
+        news = await _newsService.getNews();
       } else {
-        _allNews = await _newsService.getNewsByCategory(_selectedCategory);
+        news = await _newsService.getNewsByCategory(_selectedCategory);
+      }
+
+      // Cache'e kaydet
+      _newsCache[_selectedCategory] = news;
+
+      if (mounted) {
+        setState(() {
+          _allNews = news;
+        });
       }
     } catch (e) {
       if (kDebugMode) {
@@ -53,103 +85,96 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildAppBarTitle() {
+    _cachedAppBarTitle ??= Text(
+      'BBN',
+      style: TextStyle(
+        fontWeight: FontWeight.w900,
+        fontStyle: FontStyle.italic,
+        fontSize: 25,
+        color: Theme.of(context).brightness == Brightness.light
+            ? Theme.of(context).colorScheme.primary
+            : Theme.of(context).colorScheme.surface,
+        fontFamily: 'RobotoMono',
+        letterSpacing: 1.2,
+        wordSpacing: 1.2,
+        height: 1.5,
+      ),
+    );
+    return _cachedAppBarTitle!;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
-          ? Theme.of(context).colorScheme.background
-          : Colors.grey[400],
-      appBar: AppBar(
-        title: Text(
-          'BBN',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontStyle: FontStyle.italic,
-            fontSize: 25,
-            color: Theme.of(context).brightness == Brightness.dark
-                ? Colors.white
-                : Colors.black,
-            fontFamily: 'RobotoMono',
-            letterSpacing: 1.2,
-            wordSpacing: 1.2,
-            height: 1.5,
-            shadows: [
-              Shadow(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? Colors.black54
-                    : Colors.grey[600]!,
-                offset: Offset(1, 1),
-                blurRadius: 2,
-              ),
-            ],
-          ),
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.search,
-              size: 30,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Colors.black,
-            ),
-            tooltip: 'Search',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => SearchUserScreen()),
-              );
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: Icon(
-              Icons.filter_list,
-              size: 30,
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? Colors.white
-                  : Colors.black,
-            ),
-            onSelected: (String category) {
-              setState(() {
-                _selectedCategory = category;
-              });
-              _loadNews();
-            },
-            itemBuilder: (BuildContext context) {
-              return _categories.map((String category) {
-                return PopupMenuItem<String>(
-                  value: category,
-                  child: Text(category),
-                );
-              }).toList();
-            },
-          ),
-        ],
-      ),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              strokeWidth: 2,
-              backgroundColor: Theme.of(context).colorScheme.background,
-            ))
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 100.0),
-              child: RefreshIndicator(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                backgroundColor: Theme.of(context).colorScheme.background,
-                onRefresh: _loadNews,
-                child: ListView.builder(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  itemCount: _allNews.length,
-                  itemBuilder: (context, index) {
-                    return NewsCard(news: _allNews[index]);
-                  },
+          ? Center(child: CircularProgressIndicator())
+          : NestedScrollView(
+              physics: const BouncingScrollPhysics(),
+              headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                SliverAppBar(
+                  title: _buildAppBarTitle(),
+                  floating: true,
+                  centerTitle: true,
+                  snap: true,
+                  pinned: false, // Bu false olmalı
+                  elevation: 0,
+                  backgroundColor: Colors.transparent,
+                  expandedHeight: 0, // Genişletilmiş alan yok
+                  forceElevated: false,
+                  automaticallyImplyLeading: false,
+                  actions: [
+                    IconButton(
+                      icon: Icon(Icons.search,
+                          color:
+                              Theme.of(context).brightness == Brightness.light
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(context).colorScheme.surface),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => SearchUserScreen())),
+                    ),
+                    PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.filter_list,
+                        color: Theme.of(context).brightness == Brightness.light
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.surface,
+                      ),
+                      onSelected: (String category) {
+                        setState(() => _selectedCategory = category);
+                        _loadNews();
+                      },
+                      itemBuilder: (BuildContext context) => _categories
+                          .map((category) => PopupMenuItem<String>(
+                                value: category,
+                                child: Text(
+                                  category,
+                                  style: TextStyle(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .background,
+                                  ),
+                                ),
+                              ))
+                          .toList(),
+                    ),
+                  ],
+                ),
+              ],
+              body: Padding(
+                padding: const EdgeInsets.only(bottom: 70.0),
+                child: RefreshIndicator(
+                  onRefresh: _loadNews,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    itemCount: _allNews.length,
+                    itemBuilder: (context, index) =>
+                        NewsCard(news: _allNews[index]),
+                  ),
                 ),
               ),
             ),

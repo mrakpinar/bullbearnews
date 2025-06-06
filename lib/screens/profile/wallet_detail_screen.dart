@@ -192,7 +192,12 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_wallet.name, style: const TextStyle(fontSize: 20)),
+        title: Text(_wallet.name,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            )),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_outlined, size: 30),
@@ -211,15 +216,22 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
               onPressed: _shareWallet,
             ),
             IconButton(
-              icon: Icon(Icons.delete, color: Colors.red[500], size: 30),
+              icon: Icon(Icons.delete, size: 30),
               tooltip: 'Delete Wallet',
               onPressed: () async {
                 final confirm = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
-                    title: const Text('Delete Wallet'),
+                    title: const Text(
+                      'Delete Wallet',
+                      style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red),
+                    ),
                     content: const Text(
-                        'Are you sure you want to delete this wallet? This action cannot be undone.'),
+                        'Are you sure you want to delete this wallet? This action cannot be undone.',
+                        style: TextStyle(fontSize: 16, color: Colors.black87)),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(false),

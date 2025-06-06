@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,13 +31,46 @@ class _MarketScreenState extends State<MarketScreen> {
   SortOption _currentSortOption = SortOption.marketCapDesc;
   String _searchQuery = '';
   Set<String> _favoriteCryptos = {};
+  DateTime? _lastRefreshTime;
+  List<CryptoModel> _cachedCryptoList = [];
+  Timer? _refreshTimer;
+  final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
-    _loadFavorites().then((_) => _loadCryptoData());
+    _scrollController.addListener(_scrollListener);
+    _loadInitialData();
   }
 
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    _searchDebounce?.cancel();
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadInitialData() async {
+    await _loadFavorites();
+    await _loadCryptoData();
+    _refreshTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      if (mounted) _loadCryptoData();
+    });
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.pixels ==
+        _scrollController.position.maxScrollExtent) {
+      // Sayfa sonuna ulaşıldı, daha fazla veri yükle
+      _loadMoreData();
+    }
+  }
+
+  Future<void> _loadMoreData() async {
+    // Daha fazla veri yükleme mantığı
+  }
   // Favori kriptoları yükle
   Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
@@ -73,9 +108,6 @@ class _MarketScreenState extends State<MarketScreen> {
     // Değişiklikleri kaydet
     await _saveFavorites();
   }
-
-  DateTime _lastRefreshTime =
-      DateTime.now().subtract(const Duration(minutes: 1));
 
   void _sortCryptoList() {
     switch (_currentSortOption) {
@@ -122,35 +154,60 @@ class _MarketScreenState extends State<MarketScreen> {
 
   Future<void> _loadCryptoData() async {
     final now = DateTime.now();
-    if (now.difference(_lastRefreshTime).inSeconds < 10) {
-      // 10 saniyeden daha kısa sürede yenileme yapmayı engelle
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please wait a moment and try again (10 sec.)')),
-      );
+    if (_lastRefreshTime != null &&
+        now.difference(_lastRefreshTime!).inSeconds < 30) {
+      // 30 saniyeden daha kısa sürede yenileme yapmayı engelle
+      if (_cachedCryptoList.isNotEmpty) {
+        setState(() {
+          _cryptoList = List.from(_cachedCryptoList);
+          _filterCryptoList();
+          _isLoading = false;
+        });
+      }
       return;
     }
 
     setState(() => _isLoading = true);
     try {
-      _cryptoList = await _cryptoService.getCryptoData();
+      final newData = await _cryptoService.getCryptoData();
 
       // Favori durumunu kriptolara uygula
-      for (var crypto in _cryptoList) {
+      for (var crypto in newData) {
         crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
       }
 
-      _errorMessage = '';
-      _lastRefreshTime = now; // Yenileme zamanını güncelle
-      _filterCryptoList(); // Yeni verileri filtrele ve sırala
+      setState(() {
+        _cryptoList = newData;
+        _cachedCryptoList = List.from(newData);
+        _errorMessage = '';
+        _lastRefreshTime = now;
+        _filterCryptoList();
+      });
     } catch (e) {
-      _errorMessage = 'An error occurred while loading data: $e';
-      print(_errorMessage);
-    } finally {
-      if (mounted) {
-        // Check if widget is still mounted before calling setState
-        setState(() => _isLoading = false);
+      // Daha anlaşılır hata mesajları
+      String userFriendlyError;
+      if (e.toString().contains('timeout')) {
+        userFriendlyError = 'Connection timeout. Please check your internet.';
+      } else if (e.toString().contains('limit exceeded')) {
+        userFriendlyError = 'API limit reached. Please wait a few minutes.';
+      } else {
+        userFriendlyError = 'Failed to load data. Please try again.';
       }
+
+      // Hata durumunda cache'den veriyi göster
+      if (_cachedCryptoList.isNotEmpty) {
+        setState(() {
+          _cryptoList = List.from(_cachedCryptoList);
+          _filterCryptoList();
+          _errorMessage = '$userFriendlyError Showing cached data.';
+        });
+      } else {
+        if (mounted) {
+          setState(() => _errorMessage = userFriendlyError);
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -159,6 +216,23 @@ class _MarketScreenState extends State<MarketScreen> {
         .toStringAsFixed(5)
         .replaceAll(RegExp(r'0+$'), '')
         .replaceAll(RegExp(r'\.$'), '');
+  }
+
+  void _navigateToDetail(CryptoModel crypto) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            CryptoDetailScreen(crypto: crypto),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -184,16 +258,9 @@ class _MarketScreenState extends State<MarketScreen> {
             ),
           ),
         ],
-        iconTheme: IconThemeData(
-          color: isDarkMode ? Colors.white : Colors.black,
-        ),
+        iconTheme: IconThemeData(color: Colors.white),
         elevation: 0,
         toolbarHeight: 60,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(20),
-          ),
-        ),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -236,9 +303,14 @@ class _MarketScreenState extends State<MarketScreen> {
                 ),
               ),
               onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                  _filterCryptoList();
+                _searchDebounce?.cancel();
+                _searchDebounce = Timer(const Duration(milliseconds: 500), () {
+                  if (mounted) {
+                    setState(() {
+                      _searchQuery = value;
+                      _filterCryptoList();
+                    });
+                  }
                 });
               },
             ),
@@ -272,233 +344,193 @@ class _MarketScreenState extends State<MarketScreen> {
                         ? const Center(child: Text('No results found!'))
                         : RefreshIndicator(
                             onRefresh: _loadCryptoData,
-                            child: ListView.builder(
+                            child: ListView.separated(
+                              controller: _scrollController,
                               itemCount: _filteredList.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(height: 8),
                               itemBuilder: (context, index) {
                                 final crypto = _filteredList[index];
                                 final isPositive =
                                     crypto.priceChangePercentage24h >= 0;
 
-                                return InkWell(
-                                  onTap: () {
-                                    // Coin detay sayfasına yönlendir
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) =>
-                                            CryptoDetailScreen(crypto: crypto),
-                                      ),
-                                    );
-                                  },
-                                  child: Card(
-                                    color: isDarkMode
-                                        ? Colors.grey[800]
-                                        : Colors.white,
-                                    margin: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    shadowColor: isDarkMode
-                                        ? Colors.grey[700]
-                                        : Colors.grey[300],
-                                    elevation: 2,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12.0),
-                                      child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.center,
-                                        mainAxisSize: MainAxisSize.max,
-                                        children: [
-                                          // Leading - Crypto image
-                                          SizedBox(
-                                            width: 40,
-                                            height: 40,
-                                            child: Image.network(
-                                              crypto.image,
-                                              errorBuilder:
-                                                  (context, error, stackTrace) {
-                                                return const Icon(
-                                                  Icons.currency_bitcoin,
-                                                  size: 40,
-                                                  color: Colors.grey,
-                                                );
-                                              },
-                                            ),
-                                          ),
-
-                                          const SizedBox(width: 12),
-                                          // Middle - Crypto name, symbol, market cap
-                                          Flexible(
-                                            child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
-                                              mainAxisSize: MainAxisSize.min,
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: [
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        crypto.name,
-                                                        style: const TextStyle(
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                          fontSize: 16,
-                                                        ),
-                                                        overflow: TextOverflow
-                                                            .ellipsis,
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 8),
-                                                    Text(
-                                                      crypto.symbol
-                                                          .toUpperCase(),
-                                                      style: TextStyle(
-                                                        color: isDarkMode
-                                                            ? Colors.grey[400]
-                                                            : Colors.grey[600],
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                                Text(
-                                                  'Market Cap: \$${_formatNumber(crypto.marketCap)}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: isDarkMode
-                                                        ? Colors.grey[400]
-                                                        : Colors.grey[600],
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                                Text(
-                                                  'Volume: \$${_formatNumber(crypto.totalVolume)}',
-                                                  style: TextStyle(
-                                                    fontSize: 12,
-                                                    color: isDarkMode
-                                                        ? Colors.grey[400]
-                                                        : Colors.grey[600],
-                                                  ),
-                                                  overflow:
-                                                      TextOverflow.ellipsis,
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-
-                                          // Right side - Price and change percentage
-                                          Expanded(
-                                            flex: 2,
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.end,
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.center,
-                                              mainAxisSize: MainAxisSize.max,
-                                              children: [
-                                                Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.end,
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Text(
-                                                      '\$${formatPrice(crypto.currentPrice)}',
-                                                      style: const TextStyle(
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        fontSize: 16,
-                                                      ),
-                                                      overflow:
-                                                          TextOverflow.ellipsis,
-                                                    ),
-                                                    Row(
-                                                      mainAxisSize:
-                                                          MainAxisSize.min,
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment.end,
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Icon(
-                                                          isPositive
-                                                              ? Icons
-                                                                  .arrow_upward
-                                                              : Icons
-                                                                  .arrow_downward,
-                                                          color: isPositive
-                                                              ? Colors.green
-                                                              : Colors.red,
-                                                          size: 16,
-                                                        ),
-                                                        Text(
-                                                          '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
-                                                          style: TextStyle(
-                                                            color: isPositive
-                                                                ? Colors.green
-                                                                : Colors.red,
-                                                            fontSize: 14,
-                                                          ),
-                                                          overflow: TextOverflow
-                                                              .ellipsis,
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ],
-                                                ),
-                                                const SizedBox(width: 4),
-                                                // Favorite button
-                                                IconButton(
-                                                  icon: Icon(
-                                                    crypto.isFavorite
-                                                        ? Icons.star
-                                                        : Icons.star_border,
-                                                    color: crypto.isFavorite
-                                                        ? Colors.amber
-                                                        : isDarkMode
-                                                            ? Colors.white
-                                                            : Colors.grey,
-                                                    size: 20,
-                                                  ),
-                                                  onPressed: () {
-                                                    _toggleFavorite(crypto.id);
-                                                  },
-                                                  tooltip: crypto.isFavorite
-                                                      ? 'Remove from favorites'
-                                                      : 'Add to favorites',
-                                                  padding: EdgeInsets.zero,
-                                                  constraints:
-                                                      const BoxConstraints(),
-                                                  iconSize: 20,
-                                                  alignment:
-                                                      Alignment.centerRight,
-                                                  splashRadius: 20,
-                                                  highlightColor: isDarkMode
-                                                      ? Colors.grey[700]
-                                                      : Colors.grey[300],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
+                                return _buildCryptoItem(
+                                    context, crypto, isDarkMode, isPositive);
                               },
                             ),
                           ),
           ),
         ],
+      ),
+    );
+  }
+
+  InkWell _buildCryptoItem(BuildContext context, CryptoModel crypto,
+      bool isDarkMode, bool isPositive) {
+    final isPositive = crypto.priceChangePercentage24h >= 0;
+
+    return InkWell(
+      onTap: () => _navigateToDetail(crypto),
+      child: Card(
+        color: Theme.of(context).cardColor, // Kart rengi tema ile uyumlu
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        shadowColor: isDarkMode ? Colors.grey[700] : Colors.grey[300],
+        elevation: 2,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              // Leading - Crypto image
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: Image.network(
+                  crypto.image,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.currency_bitcoin,
+                      size: 40,
+                      color: Colors.grey,
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(width: 12),
+              // Middle - Crypto name, symbol, market cap
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            crypto.name,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          crypto.symbol.toUpperCase(),
+                          style: TextStyle(
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      'Market Cap: \$${_formatNumber(crypto.marketCap)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Volume: \$${_formatNumber(crypto.totalVolume)}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+
+              // Right side - Price and change percentage
+              Expanded(
+                flex: 2,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.max,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '\$${formatPrice(crypto.currentPrice)}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Icon(
+                              isPositive
+                                  ? Icons.arrow_upward
+                                  : Icons.arrow_downward,
+                              color: isPositive ? Colors.green : Colors.red,
+                              size: 16,
+                            ),
+                            Text(
+                              '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                              style: TextStyle(
+                                color: isPositive ? Colors.green : Colors.red,
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 4),
+                    // Favorite button
+                    IconButton(
+                      icon: Icon(
+                        crypto.isFavorite ? Icons.star : Icons.star_border,
+                        color: crypto.isFavorite
+                            ? Colors.amber
+                            : isDarkMode
+                                ? Colors.white
+                                : Colors.grey,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        _toggleFavorite(crypto.id);
+                      },
+                      tooltip: crypto.isFavorite
+                          ? 'Remove from favorites'
+                          : 'Add to favorites',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                      iconSize: 20,
+                      alignment: Alignment.centerRight,
+                      splashRadius: 20,
+                      highlightColor:
+                          isDarkMode ? Colors.grey[700] : Colors.grey[300],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

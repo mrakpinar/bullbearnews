@@ -24,6 +24,19 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
     _loadNewsDetail();
   }
 
+  late final LinearGradient _imageGradient = LinearGradient(
+    begin: Alignment.bottomCenter,
+    end: Alignment.topCenter,
+    colors: [
+      Colors.black.withOpacity(0.8),
+      Colors.transparent,
+    ],
+  );
+
+  late final bool _isDarkTheme =
+      Theme.of(context).brightness == Brightness.dark;
+  late final Color _textColor = _isDarkTheme ? Colors.white : Colors.black;
+
   Future<void> _loadNewsDetail() async {
     setState(() => _isLoading = true);
     try {
@@ -43,16 +56,18 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark
+      backgroundColor: _isDarkTheme
           ? Theme.of(context).colorScheme.background
           : Colors.grey[100],
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _news == null
               ? Center(
                   child: Text('Haber bulunamadı',
-                      style: TextStyle(color: Colors.white)))
+                      style: TextStyle(color: _textColor)))
               : CustomScrollView(
+                  // physics eklenmeli performans için
+                  physics: const BouncingScrollPhysics(),
                   slivers: [
                     SliverAppBar(
                       expandedHeight: 300,
@@ -97,7 +112,8 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                     ),
                     SliverToBoxAdapter(
                       child: Padding(
-                        padding: EdgeInsets.all(16),
+                        padding:
+                            EdgeInsets.symmetric(horizontal: 32, vertical: 25),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -111,13 +127,7 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                                         Brightness.dark
                                     ? Colors.white
                                     : Colors.black, // Başlık rengi
-                                shadows: [
-                                  Shadow(
-                                    color: Colors.black.withOpacity(0.5),
-                                    offset: Offset(2, 2),
-                                    blurRadius: 4,
-                                  ),
-                                ],
+
                                 fontStyle: FontStyle.italic,
                                 letterSpacing: 1.5,
                                 wordSpacing: 1.5,
@@ -170,10 +180,8 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.normal,
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black, // İçerik rengi
+                                color:
+                                    Theme.of(context).colorScheme.onSecondary,
                                 height: 1.6,
                                 letterSpacing: 0.5,
                                 wordSpacing: 0.5,
@@ -240,7 +248,9 @@ class _NewsDetailScreenState extends State<NewsDetailScreen> {
     );
   }
 
+  static final Map<DateTime, String> _dateCache = {};
+
   String _formatDate(DateTime date) {
-    return '${date.day}.${date.month}.${date.year}';
+    return _dateCache[date] ??= '${date.day}.${date.month}.${date.year}';
   }
 }

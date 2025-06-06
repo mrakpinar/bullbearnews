@@ -71,12 +71,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           .collection('sharedPortfolios')
           .get();
 
-      setState(() {
-        _mySharedPortfolios = snapshot.docs.map((doc) => doc.data()).toList();
-        _isLoadingSharedPortfolios = false;
-      });
+      if (mounted) {
+        // Add this check
+        setState(() {
+          _mySharedPortfolios = snapshot.docs.map((doc) => doc.data()).toList();
+          _isLoadingSharedPortfolios = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoadingSharedPortfolios = false);
+      if (mounted) {
+        // Add this check
+        setState(() => _isLoadingSharedPortfolios = false);
+      }
     }
   }
 
@@ -186,7 +192,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadProfileImage() async {
     const defaultImageUrl =
-        "https://upload.wikimedia.org/wikipedia/commons/7/7c/Profile_avatar_placeholder_large.png";
+        "https://isobarscience.com/wp-content/uploads/2020/09/default-profile-picture1.jpg";
 
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -217,7 +223,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
 
         if (mounted) {
-          // mounted kontrolü ekledik
           setState(() {
             _profileImageUrl = (imageUrl != null && imageUrl.trim().isNotEmpty)
                 ? imageUrl
@@ -226,7 +231,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       } else {
         if (mounted) {
-          // mounted kontrolü ekledik
           setState(() {
             _profileImageUrl = defaultImageUrl;
           });
@@ -235,7 +239,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (e) {
       print('Error loading profile image: $e');
       if (mounted) {
-        // mounted kontrolü ekledik
         setState(() {
           _profileImageUrl = defaultImageUrl;
         });
@@ -517,101 +520,146 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final themeProvider = Provider.of<ThemeProvider>(context);
+    final scrollController = ScrollController();
 
     return Scaffold(
       drawer: _buildDrawer(context),
-      appBar: AppBar(
-        title: const Text(
-          'Profile',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 26,
-          ),
-        ),
-        centerTitle: true,
-        elevation: 4,
-        actions: [
-          // IconButton(
-          //   icon: Icon(themeProvider.themeMode == ThemeMode.dark
-          //       ? Icons.light_mode
-          //       : Icons.dark_mode),
-          //   onPressed: () => themeProvider.toggleTheme(),
-          // ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async => await FirebaseAuth.instance.signOut(),
+      body: NestedScrollView(
+        controller: scrollController,
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverAppBar(
+            floating: true,
+            snap: true,
+            pinned: false,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            expandedHeight: 0,
+            automaticallyImplyLeading: false,
+            flexibleSpace: Container(),
+            leading: Builder(
+              builder: (context) => Padding(
+                padding: const EdgeInsets.only(left: 16.0, top: 16.0),
+                child: IconButton(
+                  icon: Icon(Icons.menu,
+                      color: themeProvider.themeMode == ThemeMode.dark
+                          ? Colors.white
+                          : Colors.black),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                ),
+              ),
+            ),
           ),
         ],
-      ),
-      body: RefreshIndicator(
-        color: themeProvider.themeMode == ThemeMode.dark
-            ? Colors.amber
-            : Colors.purple,
-        backgroundColor: themeProvider.themeMode == ThemeMode.dark
-            ? Colors.black
-            : Colors.white,
-        onRefresh: _loadData,
-        child: SingleChildScrollView(
-          child: Padding(
-            // Add padding to the entire screen
-            padding: const EdgeInsets.all(16.0),
-
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.start,
-              // Use mainAxisAlignment to align items at the start
-
-              children: [
-                if (user == null)
-                  const Center(
-                    child: Text(
-                      'Please log in to view your profile',
-                      style: TextStyle(fontSize: 18),
+        body: RefreshIndicator(
+          color: themeProvider.themeMode == ThemeMode.dark
+              ? Colors.amber
+              : Colors.purple,
+          backgroundColor: themeProvider.themeMode == ThemeMode.dark
+              ? Colors.black
+              : Colors.white,
+          onRefresh: _loadData,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (user == null)
+                    const Center(
+                      child: Text(
+                        'Please log in to view your profile',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                    )
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10.0, vertical: 10),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).cardTheme.color,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.black54
+                                  : Colors.black54,
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(10),
+                        child: UserProfileHeader(
+                          user: user,
+                          profileImageUrl: _profileImageUrl,
+                          onImageUpload: _uploadProfileImage,
+                        ),
+                      ),
                     ),
-                  )
-                else
-                  const SizedBox(height: 16),
-                UserProfileHeader(
-                  user: user,
-                  profileImageUrl: _profileImageUrl,
-                  onImageUpload: _uploadProfileImage,
-                ),
-                const SizedBox(height: 32),
-                WalletSummaryCard(
-                  totalPortfolioValue: _totalPortfolioValue,
-                  totalInvestment: _totalInvestment,
-                  totalProfitLoss: _totalProfitLoss,
-                  totalProfitLossPercentage: _totalProfitLossPercentage,
-                  onAddToWallet: _addToWallet,
-                  onShowDetails: _showPortfolioDetails,
-                  refreshCallback: _loadData,
-                ),
-                const SizedBox(height: 24),
-                FutureBuilder<List<CryptoModel>>(
-                  future: _cryptoService.getCryptoData(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    return PortfolioPieChart(
-                      walletItems: _walletItems,
-                      allCryptos: snapshot.data!,
-                    );
-                  },
-                ),
-                const SizedBox(height: 32),
-                FavoriteCryptosList(
-                  isLoading: _isLoading,
-                  favoriteCryptos: _favoriteCryptos,
-                  onRefresh: _loadFavoriteCryptos,
-                ),
-                const SizedBox(height: 32),
-                SavedNewsList(
-                    isLoading: _isNewsLoading, onRefresh: _loadSaveNews),
-                const SizedBox(height: 32),
-                _buildSharedPortfoliosSection(),
-              ],
+                  const SizedBox(height: 16), // Daha az boşluk
+                  WalletSummaryCard(
+                    totalPortfolioValue: _totalPortfolioValue,
+                    totalInvestment: _totalInvestment,
+                    totalProfitLoss: _totalProfitLoss,
+                    totalProfitLossPercentage: _totalProfitLossPercentage,
+                    onAddToWallet: _addToWallet,
+                    onShowDetails: _showPortfolioDetails,
+                    refreshCallback: _loadData,
+                  ),
+                  const SizedBox(height: 16), // Daha az boşluk
+                  FutureBuilder<List<CryptoModel>>(
+                    future: _cryptoService.getCryptoData(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return Center(
+                            child: Container(
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).cardTheme.color,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const CircularProgressIndicator()));
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).cardTheme.color,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.black54
+                                    : Colors.black54,
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: PortfolioPieChart(
+                            walletItems: _walletItems,
+                            allCryptos: snapshot.data!,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 16), // Daha az boşluk
+                  FavoriteCryptosList(
+                    isLoading: _isLoading,
+                    favoriteCryptos: _favoriteCryptos,
+                    onRefresh: _loadFavoriteCryptos,
+                  ),
+                  const SizedBox(height: 16), // Daha az boşluk
+                  SavedNewsList(
+                      isLoading: _isNewsLoading, onRefresh: _loadSaveNews),
+                  const SizedBox(height: 2), // Daha az boşluk
+                  _buildSharedPortfoliosSection(),
+                  const SizedBox(height: 150), // Daha az boşluk
+                ],
+              ),
             ),
           ),
         ),
@@ -750,6 +798,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
             onTap: () {
               Navigator.pop(context);
               // Help ekranına yönlendirme yapabilirsiniz
+            },
+          ),
+          Divider(
+            height: 1,
+            thickness: 1,
+            color: theme.dividerColor.withOpacity(0.1),
+          ),
+          ListTile(
+            leading: Icon(Icons.logout, color: theme.iconTheme.color),
+            title: const Text('Logout'),
+            onTap: () async {
+              await FirebaseAuth.instance.signOut();
+              Navigator.pushNamedAndRemoveUntil(
+                context,
+                '/auth',
+                (route) => false,
+              );
             },
           ),
         ],

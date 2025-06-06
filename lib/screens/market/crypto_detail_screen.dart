@@ -4,6 +4,7 @@ import 'package:bullbearnews/services/price_alert_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../models/crypto_model.dart';
 
 class CryptoDetailScreen extends StatefulWidget {
@@ -20,31 +21,35 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   final PriceAlertService _priceAlertService = PriceAlertService();
   late Stream<List<PriceAlert>> _priceAlertsStream;
   late CryptoModel _crypto;
+  late final WebViewController _chartController;
   Set<String> _favoriteCryptos = {};
   String _selectedAlertType = 'above';
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     _crypto = widget.crypto;
     _priceAlertController.text = _crypto.currentPrice.toString();
-
-    debugPrint('Loading alerts for crypto: ${_crypto.id}');
-    _priceAlertsStream = _priceAlertService.getAlertsForCrypto(_crypto.id)
-      ..listen((alerts) {
-        debugPrint('Alerts updated: ${alerts.length} items');
-        for (var alert in alerts) {
-          debugPrint('Alert: ${alert.cryptoSymbol} - \$${alert.targetPrice}');
-        }
-      });
-
-    _loadFavorites();
+    _initializeData();
   }
 
   @override
   void dispose() {
     _priceAlertController.dispose();
     super.dispose();
+  }
+
+  Future<void> _initializeData() async {
+    try {
+      await _loadFavorites();
+      _priceAlertsStream = _priceAlertService.getAlertsForCrypto(_crypto.id);
+      setState(() => _isInitialized = true);
+    } catch (e) {
+      debugPrint('Initialization error: $e');
+      // Hata durumunda bile temel işlevselliği koru
+      setState(() => _isInitialized = true);
+    }
   }
 
   Future<void> _loadFavorites() async {
@@ -77,7 +82,12 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
   Widget build(BuildContext context) {
     final isPositive = _crypto.priceChangePercentage24h >= 0;
     final theme = Theme.of(context);
-
+    if (!_isInitialized) {
+      // Show a loading indicator while initializing
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -301,9 +311,14 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            TradingViewChart(
-              symbol: _crypto.symbol,
-              theme: 'dark',
+            SizedBox(
+              height: 300, // Sabit bir yükseklik belirleyin
+              child: TradingViewChart(
+                symbol: _crypto.symbol,
+                theme: Theme.of(context).brightness == Brightness.dark
+                    ? 'dark'
+                    : 'light',
+              ),
             ),
           ],
         ),

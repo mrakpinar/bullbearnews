@@ -116,6 +116,10 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
               fontWeight: FontWeight.bold,
               color: Theme.of(context).colorScheme.onBackground,
               fontStyle: FontStyle.italic,
+              letterSpacing: 0.5,
+              textBaseline: TextBaseline.alphabetic,
+              wordSpacing: 1.2,
+              fontFamily: 'Roboto',
             ),
           ),
         ),
@@ -149,12 +153,8 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
           elevation: 2,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: BorderSide(
-              color: Theme.of(context).colorScheme.primaryContainer,
-              width: 1,
-            ),
           ),
-          color: Theme.of(context).colorScheme.surface,
+          color: Theme.of(context).cardTheme.color,
           margin: const EdgeInsets.only(bottom: 12),
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
@@ -179,10 +179,6 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
                     decoration: BoxDecoration(
                       color: Colors.blue.withOpacity(0.1),
                       shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.blue.withOpacity(0.5),
-                        width: 1,
-                      ),
                     ),
                     child: const Icon(Icons.wallet, color: Colors.blue),
                   ),
@@ -232,9 +228,13 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
                           _likedPortfolios.contains(portfolio['walletId']);
                       return IconButton(
                         icon: Icon(
-                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          isLiked
+                              ? Icons.bookmark_border_sharp
+                              : Icons.bookmark_sharp,
                           size: 24,
-                          color: isLiked ? Colors.red : Colors.grey,
+                          color: isLiked
+                              ? Theme.of(context).colorScheme.onSurface
+                              : Colors.grey,
                         ),
                         tooltip:
                             isLiked ? 'Unlike Portfolio' : 'Like Portfolio',
@@ -375,7 +375,7 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
-                color: Theme.of(context).colorScheme.surface,
+                color: Theme.of(context).cardTheme.color,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
                   child: Column(

@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class CryptoModel {
   final String id;
   final String symbol;
@@ -26,20 +28,43 @@ class CryptoModel {
     required this.atl,
     this.isFavorite = false,
   });
+  Color get priceChangeColor {
+    return priceChangePercentage24h >= 0 ? Colors.green : Colors.red;
+  }
+
+  IconData get priceChangeIcon {
+    return priceChangePercentage24h >= 0
+        ? Icons.arrow_upward
+        : Icons.arrow_downward;
+  } // Formatlı fiyat değişim yüzdesi
+
+  String get formattedChange {
+    return '${priceChangePercentage24h >= 0 ? '+' : ''}${priceChangePercentage24h.toStringAsFixed(2)}%';
+  }
+
+  // Formatlı market cap
+  String get formattedMarketCap {
+    if (marketCap >= 1e12) return '\$${(marketCap / 1e12).toStringAsFixed(2)}T';
+    if (marketCap >= 1e9) return '\$${(marketCap / 1e9).toStringAsFixed(2)}B';
+    if (marketCap >= 1e6) return '\$${(marketCap / 1e6).toStringAsFixed(2)}M';
+    return '\$${marketCap.toStringAsFixed(2)}';
+  }
 
   factory CryptoModel.fromJson(Map<String, dynamic> json) {
     return CryptoModel(
-      id: json['id'],
-      symbol: json['symbol'],
-      name: json['name'],
-      image: json['image'],
-      currentPrice: json['current_price'].toDouble(),
-      marketCap: json['market_cap'].toDouble(),
-      totalVolume: json['total_volume'].toDouble(),
-      circulatingSupply: json['circulating_supply'].toDouble(),
-      priceChangePercentage24h: json['price_change_percentage_24h'].toDouble(),
-      ath: json['ath'].toDouble(),
-      atl: json['atl'].toDouble(),
+      id: json['id'] ?? '',
+      symbol: json['symbol'] ?? '',
+      name: json['name'] ?? '',
+      image: json['image'] ?? '',
+      currentPrice: (json['current_price'] as num?)?.toDouble() ?? 0.0,
+      marketCap: (json['market_cap'] as num?)?.toDouble() ?? 0.0,
+      totalVolume: (json['total_volume'] as num?)?.toDouble() ?? 0.0,
+      circulatingSupply:
+          (json['circulating_supply'] as num?)?.toDouble() ?? 0.0,
+      priceChangePercentage24h:
+          (json['price_change_percentage_24h'] as num?)?.toDouble() ?? 0.0,
+      ath: (json['ath'] as num?)?.toDouble() ?? 0.0,
+      atl: (json['atl'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
