@@ -6,8 +6,6 @@ import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/widgets/favorite_cryptos_list.dart';
 import 'package:bullbearnews/widgets/portfolio_pie_chart.dart';
 import 'package:bullbearnews/widgets/saved_news_list.dart';
-import 'package:bullbearnews/widgets/user_profile_header.dart';
-import 'package:bullbearnews/widgets/wallet_summary_card.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloudinary_public/cloudinary_public.dart';
 import 'package:flutter/material.dart';
@@ -46,6 +44,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _profileImageUrl;
   List<Map<String, dynamic>> _mySharedPortfolios = [];
   bool _isLoadingSharedPortfolios = true;
+  final ScrollController _scrollController = ScrollController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   void initState() {
@@ -57,6 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -84,31 +85,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _isLoadingSharedPortfolios = false);
       }
     }
-  }
-
-  Widget _buildSharedPortfoliosSection() {
-    if (_isLoadingSharedPortfolios) {
-      return Center(child: CircularProgressIndicator());
-    }
-
-    if (_mySharedPortfolios.isEmpty) {
-      return SizedBox(); // Boşsa hiçbir şey gösterme
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
-          child: Text(
-            'My Shared Portfolios',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ),
-        ..._mySharedPortfolios
-            .map((portfolio) => _buildSharedPortfolioItem(portfolio)),
-      ],
-    );
   }
 
   Widget _buildSharedPortfolioItem(Map<String, dynamic> portfolio) {
@@ -520,149 +496,308 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final scrollController = ScrollController();
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+    final theme = Theme.of(context);
 
     return Scaffold(
-      drawer: _buildDrawer(context),
-      body: NestedScrollView(
-        controller: scrollController,
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+      key: _scaffoldKey, // Scaffold key eklendi
+      backgroundColor: theme.colorScheme.background,
+      drawer: _buildDrawer(context), // Drawer eklendi
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
           SliverAppBar(
-            floating: true,
-            snap: true,
-            pinned: false,
-            backgroundColor: Colors.transparent,
+            expandedHeight: 80,
+            floating: false,
+            pinned: true,
             elevation: 0,
-            expandedHeight: 0,
-            automaticallyImplyLeading: false,
-            flexibleSpace: Container(),
-            leading: Builder(
-              builder: (context) => Padding(
-                padding: const EdgeInsets.only(left: 16.0, top: 16.0),
+            backgroundColor: Colors.transparent,
+            flexibleSpace: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [const Color(0xFF393E46), const Color(0xFF393E46)],
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
+                ),
+              ),
+              child: FlexibleSpaceBar(
+                centerTitle: true,
+                title: Text(
+                  "My Profile",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 22,
+                    color: Theme.of(context).colorScheme.secondary,
+                    letterSpacing: -1,
+                  ),
+                ),
+                titlePadding: const EdgeInsets.only(bottom: 16),
+              ),
+            ),
+            leading: Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.2),
+                    width: 1,
+                  ),
+                ),
                 child: IconButton(
-                  icon: Icon(Icons.menu,
-                      color: themeProvider.themeMode == ThemeMode.dark
-                          ? Colors.white
-                          : Colors.black),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  icon: Icon(
+                    Icons.menu, // Geri tuşu yerine menü ikonu
+                    color: Theme.of(context).colorScheme.secondary,
+                    size: 20,
+                  ),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                 ),
               ),
             ),
           ),
-        ],
-        body: RefreshIndicator(
-          color: themeProvider.themeMode == ThemeMode.dark
-              ? Colors.amber
-              : Colors.purple,
-          backgroundColor: themeProvider.themeMode == ThemeMode.dark
-              ? Colors.black
-              : Colors.white,
-          onRefresh: _loadData,
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (user == null)
-                    const Center(
-                      child: Text(
-                        'Please log in to view your profile',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                    )
-                  else
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10.0, vertical: 10),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).cardTheme.color,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Theme.of(context).brightness ==
-                                      Brightness.dark
-                                  ? Colors.black54
-                                  : Colors.black54,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        padding: const EdgeInsets.all(10),
-                        child: UserProfileHeader(
-                          user: user,
-                          profileImageUrl: _profileImageUrl,
-                          onImageUpload: _uploadProfileImage,
-                        ),
+
+          // Content
+          SliverPadding(
+            padding: const EdgeInsets.all(24),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                if (user == null)
+                  Center(
+                    child: Text(
+                      'Please log in to view your profile',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: isDarkMode
+                            ? const Color(0xFFDFD0B8)
+                            : const Color(0xFF222831),
                       ),
                     ),
-                  const SizedBox(height: 16), // Daha az boşluk
-                  WalletSummaryCard(
-                    totalPortfolioValue: _totalPortfolioValue,
-                    totalInvestment: _totalInvestment,
-                    totalProfitLoss: _totalProfitLoss,
-                    totalProfitLossPercentage: _totalProfitLossPercentage,
-                    onAddToWallet: _addToWallet,
-                    onShowDetails: _showPortfolioDetails,
-                    refreshCallback: _loadData,
-                  ),
-                  const SizedBox(height: 16), // Daha az boşluk
-                  FutureBuilder<List<CryptoModel>>(
-                    future: _cryptoService.getCryptoData(),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) {
-                        return Center(
-                            child: Container(
+                  )
+                else
+                  Column(
+                    children: [
+                      // User Profile Card
+                      _buildUserProfileCard(context, theme, isDarkMode),
+
+                      const SizedBox(height: 24),
+
+                      // Portfolio Summary Card
+                      _buildPortfolioSummaryCard(theme, isDarkMode),
+
+                      const SizedBox(height: 24),
+
+                      // Portfolio Pie Chart
+                      FutureBuilder<List<CryptoModel>>(
+                        future: _cryptoService.getCryptoData(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return Center(
+                              child: Container(
+                                padding: const EdgeInsets.all(24),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).cardTheme.color,
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  color: isDarkMode
+                                      ? const Color(0xFF393E46).withOpacity(0.7)
+                                      : const Color(0xFFF5F5F5)
+                                          .withOpacity(0.7),
                                 ),
-                                child: const CircularProgressIndicator()));
-                      }
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10.0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).cardTheme.color,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Theme.of(context).brightness ==
-                                        Brightness.dark
-                                    ? Colors.black54
-                                    : Colors.black54,
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
+                                child: const CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+                          return _buildGlassSection(
+                            title: 'Portfolio Distribution',
+                            theme: theme,
+                            isDarkMode: isDarkMode,
+                            children: [
+                              PortfolioPieChart(
+                                walletItems: _walletItems,
+                                allCryptos: snapshot.data!,
                               ),
                             ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Favorite Cryptos
+                      _buildGlassSection(
+                        title: 'Favorite Cryptos',
+                        theme: theme,
+                        isDarkMode: isDarkMode,
+                        children: [
+                          FavoriteCryptosList(
+                            isLoading: _isLoading,
+                            favoriteCryptos: _favoriteCryptos,
+                            onRefresh: _loadFavoriteCryptos,
                           ),
-                          child: PortfolioPieChart(
-                            walletItems: _walletItems,
-                            allCryptos: snapshot.data!,
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Saved News
+                      _buildGlassSection(
+                        title: 'Saved News',
+                        theme: theme,
+                        isDarkMode: isDarkMode,
+                        children: [
+                          SavedNewsList(
+                            isLoading: _isNewsLoading,
+                            onRefresh: _loadSaveNews,
                           ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // Shared Portfolios
+                      if (!_isLoadingSharedPortfolios &&
+                          _mySharedPortfolios.isNotEmpty)
+                        _buildGlassSection(
+                          title: 'Shared Portfolios',
+                          theme: theme,
+                          isDarkMode: isDarkMode,
+                          children: [
+                            ..._mySharedPortfolios.map((portfolio) =>
+                                _buildSharedPortfolioItem(portfolio)),
+                          ],
                         ),
-                      );
-                    },
+
+                      const SizedBox(height: 50),
+                    ],
                   ),
-                  const SizedBox(height: 16), // Daha az boşluk
-                  FavoriteCryptosList(
-                    isLoading: _isLoading,
-                    favoriteCryptos: _favoriteCryptos,
-                    onRefresh: _loadFavoriteCryptos,
-                  ),
-                  const SizedBox(height: 16), // Daha az boşluk
-                  SavedNewsList(
-                      isLoading: _isNewsLoading, onRefresh: _loadSaveNews),
-                  const SizedBox(height: 2), // Daha az boşluk
-                  _buildSharedPortfoliosSection(),
-                  const SizedBox(height: 150), // Daha az boşluk
-                ],
+              ]),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserProfileCard(
+      BuildContext context, ThemeData theme, bool isDarkMode) {
+    final user = FirebaseAuth.instance.currentUser;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDarkMode
+              ? [const Color(0xFF393E46), const Color(0xFF393E46)]
+              : [const Color(0xFFF5F5F5), const Color(0xFFF5F5F5)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDarkMode
+              ? const Color(0xFF393E46).withOpacity(0.3)
+              : const Color(0xFFE0E0E0).withOpacity(0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? const Color(0xFF222831).withOpacity(0.3)
+                : const Color(0xFFDFD0B8).withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: _uploadProfileImage,
+            child: Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF948979).withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: ClipOval(
+                child: _profileImageUrl != null
+                    ? Image.network(
+                        _profileImageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(
+                          Icons.person,
+                          size: 40,
+                          color: isDarkMode
+                              ? const Color(0xFFDFD0B8)
+                              : const Color(0xFF222831),
+                        ),
+                      )
+                    : Icon(
+                        Icons.person,
+                        size: 40,
+                        color: isDarkMode
+                            ? const Color(0xFFDFD0B8)
+                            : const Color(0xFF222831),
+                      ),
               ),
             ),
           ),
-        ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user?.displayName ?? 'Guest User',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: isDarkMode
+                        ? const Color(0xFFDFD0B8)
+                        : const Color(0xFF222831),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  user?.email ?? 'Not logged in',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: const Color(0xFF948979),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const SettingsScreen()),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    side: BorderSide(
+                      color: const Color(0xFF948979).withOpacity(0.3),
+                    ),
+                  ),
+                  child: Text(
+                    'Edit Profile',
+                    style: TextStyle(
+                      color: isDarkMode
+                          ? const Color(0xFFDFD0B8)
+                          : const Color(0xFF222831),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -673,15 +808,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final user = FirebaseAuth.instance.currentUser;
 
     return Drawer(
-      backgroundColor: isDarkMode ? Colors.grey[900] : Colors.white,
+      backgroundColor: Theme.of(context).colorScheme.background,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           topRight: Radius.circular(20),
           bottomRight: Radius.circular(20),
-        ),
-        side: BorderSide(
-          color: isDarkMode ? Colors.grey[800]! : Colors.purple[300]!,
-          width: 1,
         ),
       ),
       elevation: 4,
@@ -691,7 +822,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(
-              color: isDarkMode ? Colors.grey[800]! : Colors.purple[300]!,
+              color: isDarkMode
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.secondary,
               borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(20),
                 bottomRight: Radius.circular(20),
@@ -706,9 +839,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             padding: const EdgeInsets.all(16.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // User profile image and name
                 CircleAvatar(
                   radius: 30,
                   backgroundImage: _profileImageUrl != null
@@ -716,7 +848,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       : const AssetImage('assets/default_profile.png')
                           as ImageProvider,
                 ),
-
                 const SizedBox(height: 10),
                 Text(
                   user?.displayName ?? 'Guest',
@@ -724,13 +855,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     color: Colors.white,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
-                    shadows: [
-                      Shadow(
-                        color: isDarkMode ? Colors.black54 : Colors.grey[300]!,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    fontFamily: 'Mono',
                   ),
                 ),
                 Text(
@@ -738,6 +863,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 14,
+                    fontFamily: 'Mono',
                   ),
                 ),
               ],
@@ -747,11 +873,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             leading: Icon(Icons.home, color: theme.iconTheme.color),
             title: const Text('Home'),
             onTap: () {
-              Navigator.pop(context); // Drawer'ı kapat
+              Navigator.pop(context);
               Navigator.pushNamedAndRemoveUntil(
                 context,
                 '/auth',
-                (route) => false, // Tüm önceki route'ları temizler
+                (route) => false,
               );
             },
           ),
@@ -784,7 +910,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Navigator.pop(context);
               Navigator.push(context,
                   MaterialPageRoute(builder: (context) => SettingsScreen()));
-              // Settings ekranına yönlendirme yapabilirsiniz
             },
           ),
           Divider(
@@ -797,7 +922,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             title: const Text('Help & Feedback'),
             onTap: () {
               Navigator.pop(context);
-              // Help ekranına yönlendirme yapabilirsiniz
             },
           ),
           Divider(
@@ -819,6 +943,231 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildPortfolioSummaryCard(ThemeData theme, bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: isDarkMode
+              ? [const Color(0xFF393E46), const Color(0xFF393E46)]
+              : [const Color(0xFFF5F5F5), const Color(0xFFF5F5F5)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: isDarkMode
+              ? const Color(0xFF393E46).withOpacity(0.3)
+              : const Color(0xFFE0E0E0).withOpacity(0.5),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isDarkMode
+                ? const Color(0xFF222831).withOpacity(0.3)
+                : const Color(0xFFDFD0B8).withOpacity(0.2),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Portfolio Value',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: isDarkMode
+                      ? const Color(0xFFDFD0B8)
+                      : const Color(0xFF222831),
+                ),
+              ),
+              Text(
+                '\$${_totalPortfolioValue.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode
+                      ? const Color(0xFFDFD0B8)
+                      : const Color(0xFF222831),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Investment',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: const Color(0xFF948979),
+                    ),
+                  ),
+                  Text(
+                    '\$${_totalInvestment.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isDarkMode
+                          ? const Color(0xFFDFD0B8)
+                          : const Color(0xFF222831),
+                    ),
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    'Profit/Loss',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: const Color(0xFF948979),
+                    ),
+                  ),
+                  Text(
+                    '${_totalProfitLossPercentage.toStringAsFixed(2)}% (\$${_totalProfitLoss.toStringAsFixed(2)})',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: _totalProfitLoss >= 0 ? Colors.green : Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.add,
+                  label: 'Add Coin',
+                  onPressed: _addToWallet,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.pie_chart_outline,
+                  label: 'Details',
+                  onPressed: _showPortfolioDetails,
+                  isDarkMode: isDarkMode,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+    required bool isDarkMode,
+  }) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF948979).withOpacity(0.1),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: const Color(0xFF948979).withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color:
+                isDarkMode ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: isDarkMode
+                  ? const Color(0xFFDFD0B8)
+                  : const Color(0xFF222831),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGlassSection({
+    required String title,
+    required ThemeData theme,
+    required bool isDarkMode,
+    required List<Widget> children,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: isDarkMode
+                ? const Color(0xFF393E46).withOpacity(0.7)
+                : const Color(0xFFF5F5F5).withOpacity(0.7),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDarkMode
+                  ? const Color(0xFF393E46).withOpacity(0.3)
+                  : const Color(0xFFE0E0E0).withOpacity(0.5),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode
+                    ? const Color(0xFF222831).withOpacity(0.2)
+                    : const Color(0xFFDFD0B8).withOpacity(0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(left: 8, bottom: 16),
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: isDarkMode
+                        ? const Color(0xFFDFD0B8)
+                        : const Color(0xFF222831),
+                    letterSpacing: -0.8,
+                  ),
+                ),
+              ),
+              Column(children: children),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

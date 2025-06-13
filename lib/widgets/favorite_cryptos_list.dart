@@ -102,33 +102,7 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'My Favorite Cryptos',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: isDarkMode ? Colors.white : Colors.black,
-                    fontSize: 20,
-                  ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: widget.onRefresh,
-              tooltip: 'Refresh',
-              color: isDarkMode ? Colors.white : Colors.black,
-              iconSize: 24,
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        _buildCryptoList(context, isDarkMode),
-      ],
-    );
+    return _buildCryptoList(context, isDarkMode);
   }
 
   Widget _buildCryptoList(BuildContext context, bool isDarkMode) {

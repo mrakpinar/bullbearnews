@@ -1,15 +1,14 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:bullbearnews/constants/colors.dart';
-import 'package:bullbearnews/models/announcement_model.dart';
-import 'package:bullbearnews/models/poll_model.dart';
-import 'package:bullbearnews/services/announcement_service.dart';
-import 'package:bullbearnews/services/poll_serivice.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../../models/chat_room_model.dart';
-import 'chat_screen.dart';
-import '../../services/chat_service.dart';
 import 'package:intl/intl.dart';
+import '../../models/announcement_model.dart';
+import '../../models/chat_room_model.dart';
+import '../../models/poll_model.dart';
+import '../../services/announcement_service.dart';
+import '../../services/chat_service.dart';
+import '../../services/poll_serivice.dart';
+import 'chat_screen.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -19,95 +18,206 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final TabController _tabController;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _tabController.addListener(_handleTabChange);
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _animationController.forward();
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
-  void _handleTabChange() {
-    if (_tabController.indexIsChanging) {
-      setState(() {});
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF222831) : const Color(0xFFDFD0B8);
 
     return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 42,
-        titleSpacing: 0,
-        automaticallyImplyLeading: false,
-        bottom: _TabBarSection(controller: _tabController),
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(isDark),
+            _buildTabBar(isDark),
+            Expanded(
+              child: AnimatedBuilder(
+                animation: _fadeAnimation,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const BouncingScrollPhysics(),
+                      children: const [
+                        ChatRoomsTab(),
+                        PollsTab(),
+                        AnnouncementsTab(),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        physics: const BouncingScrollPhysics(),
-        children: const [
-          ChatRoomsTab(),
-          PollsTab(),
-          AnnouncementsTab(),
+    );
+  }
+
+  Widget _buildHeader(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Community Hub',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: isDark
+                        ? const Color(0xFFDFD0B8)
+                        : const Color(0xFF222831),
+                    fontFamily: 'DMSerif',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Connect with other investors',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark
+                        ? const Color(0xFF948979)
+                        : const Color(0xFF393E46),
+                    fontFamily: 'DMSerif',
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
-}
 
-class _TabBarSection extends StatelessWidget implements PreferredSizeWidget {
-  final TabController controller;
-
-  const _TabBarSection({required this.controller});
-
-  @override
-  Size get preferredSize => const Size.fromHeight(48);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
+  Widget _buildTabBar(bool isDark) {
     return Container(
-      color: theme.colorScheme.primary,
+      height: 50,
+      margin: const EdgeInsets.only(bottom: 16),
       child: TabBar(
-        controller: controller,
-        indicatorColor: AppColors.accent,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white.withOpacity(0.7),
+        controller: _tabController,
+        indicatorColor:
+            isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+        labelColor: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+        unselectedLabelColor: isDark
+            ? const Color(0xFFDFD0B8).withOpacity(0.7)
+            : const Color(0xFF222831).withOpacity(0.7),
+        labelStyle: const TextStyle(
+          fontFamily: 'DMSerif',
+          fontWeight: FontWeight.w600,
+        ),
         dividerColor: Colors.transparent,
-        labelPadding: const EdgeInsets.symmetric(horizontal: 16.0),
-        indicator: const UnderlineTabIndicator(
-          borderSide: BorderSide(width: 3.0, color: AppColors.accent),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: 'DMSerif',
         ),
         tabs: [
-          _CustomTab(
-            index: 0,
-            controller: controller,
-            icon: Icons.forum_outlined,
-            label: 'Chat Rooms',
+          Tab(
+            icon: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 0;
+                return Icon(
+                  isSelected ? Icons.chat_bubble : Icons.chat_bubble_outline,
+                  size: isSelected ? 26 : 22,
+                );
+              },
+            ),
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 0;
+                return Text(
+                  'Chats',
+                  style: TextStyle(
+                    fontFamily: 'DMSerif',
+                    fontWeight: FontWeight.w500,
+                    fontSize: isSelected ? 14 : 12,
+                  ),
+                );
+              },
+            ),
           ),
-          _CustomTab(
-            index: 1,
-            controller: controller,
-            icon: Icons.poll_outlined,
-            label: 'Polls',
+          Tab(
+            icon: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 1;
+                return Icon(
+                  isSelected ? Icons.poll_rounded : Icons.poll_outlined,
+                  size: isSelected ? 26 : 22,
+                );
+              },
+            ),
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 1;
+                return Text(
+                  'Polls',
+                  style: TextStyle(
+                    fontFamily: 'DMSerif',
+                    fontWeight: FontWeight.w500,
+                    fontSize: isSelected ? 14 : 12,
+                  ),
+                );
+              },
+            ),
           ),
-          _CustomTab(
-            index: 2,
-            controller: controller,
-            icon: Icons.announcement_outlined,
-            label: 'Announcements',
+          Tab(
+            icon: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 2;
+                return Icon(
+                  isSelected ? Icons.campaign : Icons.campaign_outlined,
+                  size: isSelected ? 26 : 22,
+                );
+              },
+            ),
+            child: AnimatedBuilder(
+              animation: _tabController,
+              builder: (context, child) {
+                final isSelected = _tabController.index == 2;
+                return Text(
+                  'Announcements',
+                  style: TextStyle(
+                    fontFamily: 'DMSerif',
+                    fontWeight: FontWeight.w500,
+                    fontSize: isSelected ? 14 : 12,
+                  ),
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -115,63 +225,75 @@ class _TabBarSection extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-class _CustomTab extends StatelessWidget {
-  final int index;
-  final TabController controller;
-  final IconData icon;
-  final String label;
-
-  const _CustomTab({
-    required this.index,
-    required this.controller,
-    required this.icon,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSelected = controller.index == index;
-
-    return Tab(
-      icon: Icon(
-        icon,
-        size: isSelected ? 30 : 24,
-        semanticLabel: label,
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: isSelected ? 13 : 12,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 1,
-        ),
+// ChatRoomsTab - Güncellenmiş versiyon
+class ChatRoomsTab extends StatelessWidget {
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    bool isDark = false,
+    String? subtitle,
+  }) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 48,
+            color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+              fontFamily: 'DMSerif',
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 14,
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontFamily: 'DMSerif',
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
-}
 
-class ChatRoomsTab extends StatelessWidget {
   const ChatRoomsTab({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: StreamBuilder<List<ChatRoom>>(
         stream: ChatService().getChatRooms(),
-        initialData: const [],
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+              ),
+            );
           }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          final rooms = snapshot.data!;
-          if (rooms.isEmpty) {
-            return const Center(child: Text('No chat rooms available'));
+          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return _buildEmptyState(
+              icon: Icons.forum_outlined,
+              title: 'No chat rooms available',
+              isDark: isDark,
+            );
           }
 
           return GridView.builder(
@@ -181,8 +303,11 @@ class ChatRoomsTab extends StatelessWidget {
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
             ),
-            itemCount: rooms.length,
-            itemBuilder: (context, index) => _ChatRoomCard(room: rooms[index]),
+            itemCount: snapshot.data!.length,
+            itemBuilder: (context, index) => _ChatRoomCard(
+              room: snapshot.data![index],
+              isDark: isDark,
+            ),
           );
         },
       ),
@@ -192,20 +317,20 @@ class ChatRoomsTab extends StatelessWidget {
 
 class _ChatRoomCard extends StatelessWidget {
   final ChatRoom room;
+  final bool isDark;
 
-  const _ChatRoomCard({required this.room});
+  const _ChatRoomCard({required this.room, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final currentUser = ChatService().getCurrentUser();
     final hasJoined =
         currentUser != null && room.users.contains(currentUser.uid);
 
     return Card(
-      color: theme.cardTheme.color,
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: isDark ? const Color(0xFF393E46) : Colors.white,
       child: InkWell(
         onTap: room.isActive
             ? () => Navigator.push(
@@ -222,33 +347,44 @@ class _ChatRoomCard extends StatelessWidget {
             children: [
               Icon(
                 Icons.chat_bubble_outline,
-                color: room.isActive ? theme.colorScheme.surface : Colors.grey,
+                color: room.isActive
+                    ? (isDark
+                        ? const Color(0xFFDFD0B8)
+                        : const Color(0xFF222831))
+                    : Colors.grey,
                 size: 32,
               ),
               const SizedBox(height: 8),
               Text(
                 room.name,
                 style: TextStyle(
-                  color:
-                      room.isActive ? theme.colorScheme.surface : Colors.grey,
+                  color: room.isActive
+                      ? (isDark
+                          ? const Color(0xFFDFD0B8)
+                          : const Color(0xFF222831))
+                      : Colors.grey,
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
+                  fontFamily: 'DMSerif',
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 4),
               Expanded(
                 child: Text(
                   room.description,
-                  style:
-                      theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                  style: TextStyle(
+                    color: isDark
+                        ? const Color(0xFF948979)
+                        : const Color(0xFF393E46),
+                    fontFamily: 'DMSerif',
+                  ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
               const SizedBox(height: 8),
-              _RoomStatusSection(room: room, hasJoined: hasJoined),
+              _RoomStatusSection(
+                  room: room, hasJoined: hasJoined, isDark: isDark),
             ],
           ),
         ),
@@ -260,27 +396,31 @@ class _ChatRoomCard extends StatelessWidget {
 class _RoomStatusSection extends StatelessWidget {
   final ChatRoom room;
   final bool hasJoined;
+  final bool isDark;
 
-  const _RoomStatusSection({required this.room, required this.hasJoined});
+  const _RoomStatusSection({
+    required this.room,
+    required this.hasJoined,
+    required this.isDark,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     if (!room.isActive) {
       return Column(
         children: [
-          const _RoomStatusRow(icon: Icons.lock, text: 'Closed'),
+          _RoomStatusRow(
+            icon: Icons.lock,
+            text: 'Closed',
+            isDark: isDark,
+          ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            alignment: Alignment.center,
-            child: Text(
-              'Room is inactive',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-              ),
+          Text(
+            'Room is inactive',
+            style: TextStyle(
+              color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+              fontFamily: 'DMSerif',
+              fontStyle: FontStyle.italic,
             ),
           ),
         ],
@@ -292,21 +432,24 @@ class _RoomStatusSection extends StatelessWidget {
         _RoomStatusRow(
           icon: Icons.group,
           text: '${room.users.length} members',
-          color: theme.colorScheme.surface,
+          isDark: isDark,
         ),
         const SizedBox(height: 8),
         ElevatedButton(
           onPressed: hasJoined ? null : () => ChatService().joinRoom(room.id),
           style: ElevatedButton.styleFrom(
-            backgroundColor: theme.colorScheme.background,
+            backgroundColor:
+                isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
             minimumSize: const Size(double.infinity, 36),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           child: Text(
             hasJoined ? 'Joined' : 'Join',
             style: TextStyle(
-              color: hasJoined ? Colors.grey : Colors.white,
+              color: const Color(0xFFDFD0B8),
+              fontFamily: 'DMSerif',
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -319,26 +462,30 @@ class _RoomStatusSection extends StatelessWidget {
 class _RoomStatusRow extends StatelessWidget {
   final IconData icon;
   final String text;
-  final Color? color;
+  final bool isDark;
 
   const _RoomStatusRow({
     required this.icon,
     required this.text,
-    this.color,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, color: color ?? Colors.grey, size: 16),
+        Icon(
+          icon,
+          color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+          size: 16,
+        ),
         const SizedBox(width: 4),
         Text(
           text,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: Colors.grey),
+          style: TextStyle(
+            color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+            fontFamily: 'DMSerif',
+          ),
         ),
       ],
     );
@@ -417,9 +564,12 @@ class _PollCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               poll.question,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 18,
+                fontFamily: 'DMSerif',
+                letterSpacing: 1.2,
+                color: Theme.of(context).colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 16),
@@ -467,17 +617,20 @@ class _PollHeader extends StatelessWidget {
           style: TextStyle(
             letterSpacing: 1,
             color: poll.isActive ? Colors.green : Colors.grey,
+            fontFamily: 'DMSerif',
           ),
         ),
         const Spacer(),
-        const Icon(Icons.poll_outlined, color: Colors.purple, size: 20),
+        Icon(Icons.poll_outlined,
+            color: Theme.of(context).colorScheme.secondary, size: 22),
         const SizedBox(width: 8),
         Text(
           'POLL',
           style: TextStyle(
-            letterSpacing: 1,
-            color: Colors.purple,
-          ),
+              letterSpacing: 1,
+              color: Theme.of(context).colorScheme.secondary,
+              fontWeight: FontWeight.w700,
+              fontFamily: 'DMSerif'),
         ),
       ],
     );
@@ -520,11 +673,11 @@ class _PollOption extends StatelessWidget {
             margin: const EdgeInsets.only(bottom: 8),
             decoration: BoxDecoration(
               color: isSelected
-                  ? Colors.purple.withOpacity(0.5)
+                  ? Theme.of(context).colorScheme.secondary
                   : hasVoted
-                      ? Colors.purple.withOpacity(0.1)
+                      ? Theme.of(context).colorScheme.primary
                       : poll.isActive
-                          ? Colors.white
+                          ? Colors.white60
                           : Colors.grey[200],
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
@@ -555,16 +708,18 @@ class _PollOption extends StatelessWidget {
                           ? Colors.white
                           : hasVoted || !poll.isActive
                               ? Colors.grey[600]
-                              : Colors.grey[800],
+                              : Theme.of(context).colorScheme.primary,
+                      fontFamily: 'DMSerif',
+                      fontSize: 16,
                     ),
                   ),
                 ),
                 if (canShowResults)
                   Text(
                     '$percentage%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.purple,
+                      color: Theme.of(context).colorScheme.background,
                     ),
                   ),
               ],
@@ -642,7 +797,9 @@ class _PollFooter extends StatelessWidget {
                       ? 'Select an option to vote'
                       : 'This poll is closed',
               style: TextStyle(
-                color: hasVoted ? Colors.green : Colors.purple[800],
+                color: hasVoted
+                    ? Colors.green
+                    : Theme.of(context).colorScheme.secondary,
               ),
             ),
           ),
@@ -703,7 +860,7 @@ class _AnnouncementCard extends StatelessWidget {
     final isDark = theme.brightness == Brightness.dark;
 
     return Card(
-      color: isDark ? Colors.black38 : Colors.white,
+      color: Theme.of(context).cardTheme.color,
       elevation: 2,
       shape: RoundedRectangleBorder(
         side: BorderSide(

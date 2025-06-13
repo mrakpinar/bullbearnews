@@ -13,7 +13,8 @@ class ShownProfileScreen extends StatefulWidget {
   State<ShownProfileScreen> createState() => _ShownProfileScreenState();
 }
 
-class _ShownProfileScreenState extends State<ShownProfileScreen> {
+class _ShownProfileScreenState extends State<ShownProfileScreen>
+    with SingleTickerProviderStateMixin {
   DocumentSnapshot? _userDoc;
   bool _isFollowing = false;
   bool _isLoading = true;
@@ -23,13 +24,29 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
   bool _isLoadingPortfolios = true;
   List<String> _likedPortfolios = [];
   bool _isLoadingLikes = true;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
     _loadUser();
     _loadSharedPortfolios();
     _loadLikedPortfolios();
+    _animationController.forward();
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLikedPortfolios() async {
@@ -88,18 +105,51 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
 
   Widget _buildPortfolioList() {
     if (_isLoadingPortfolios) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32.0),
+          child: CircularProgressIndicator(strokeWidth: 3),
+        ),
+      );
     }
 
     if (_sharedPortfolios.isEmpty) {
-      return Center(
-        child: Text(
-          'No shared portfolios yet',
-          style: TextStyle(
-            fontSize: 16,
-            color: Colors.grey[600],
-            fontStyle: FontStyle.italic,
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 40),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Theme.of(context).dividerColor.withOpacity(0.2),
+            width: 1,
           ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.folder_open_outlined,
+              size: 48,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No shared portfolios yet',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This user hasn\'t shared any portfolios publicly',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[500],
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -107,25 +157,58 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: Text(
-            'Shared Portfolios',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.onBackground,
-              fontStyle: FontStyle.italic,
-              letterSpacing: 0.5,
-              textBaseline: TextBaseline.alphabetic,
-              wordSpacing: 1.2,
-              fontFamily: 'Roboto',
-            ),
+        Container(
+          margin: const EdgeInsets.only(bottom: 20, left: 10),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.share_outlined,
+                  size: 24,
+                  color: Colors.blue,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Shared Portfolios',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).colorScheme.onBackground,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    Text(
+                      '${_sharedPortfolios.length} portfolios',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        ..._sharedPortfolios.map(
-          (portfolio) => _buildPortfolioCard(portfolio),
-        ),
+        ..._sharedPortfolios.asMap().entries.map(
+              (entry) => AnimatedContainer(
+                duration: Duration(milliseconds: 300 + (entry.key * 100)),
+                curve: Curves.easeOutBack,
+                child: _buildPortfolioCard(entry.value),
+              ),
+            ),
       ],
     );
   }
@@ -142,113 +225,165 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
           .get(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Card(
-            child: ListTile(title: Text('Loading...')),
+          return Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            child: Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: Theme.of(context).dividerColor.withOpacity(0.2),
+                  width: 1,
+                ),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    CircularProgressIndicator(strokeWidth: 2),
+                    SizedBox(width: 16),
+                    Text('Loading...'),
+                  ],
+                ),
+              ),
+            ),
           );
         }
 
         final wallet =
             Wallet.fromJson(snapshot.data!.data() as Map<String, dynamic>);
-        return Card(
-          elevation: 2,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-          color: Theme.of(context).cardTheme.color,
-          margin: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => WalletDetailScreen(
-                    wallet: wallet,
-                    onUpdate: () {},
-                    isSharedView: true,
-                  ),
-                ),
-              );
-            },
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.wallet, color: Colors.blue),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          wallet.name,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontStyle: FontStyle.italic,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${wallet.items.length} assets',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
-                            color:
-                                Theme.of(context).brightness == Brightness.dark
-                                    ? Colors.white
-                                    : Colors.black,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                      ],
+        final isLiked = _likedPortfolios.contains(portfolio['walletId']);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: Theme.of(context).dividerColor.withOpacity(0.2),
+                width: 1,
+              ),
+            ),
+            color: Theme.of(context).cardTheme.color,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => WalletDetailScreen(
+                      wallet: wallet,
+                      onUpdate: () {},
+                      isSharedView: true,
                     ),
                   ),
-                  // Like button
-                  Builder(
-                    builder: (context) {
-                      final isLiked =
-                          _likedPortfolios.contains(portfolio['walletId']);
-                      return IconButton(
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.blue.withOpacity(0.1),
+                            Colors.blue.withOpacity(0.05),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Icon(
+                        Icons.wallet_outlined,
+                        color: Colors.blue,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            wallet.name,
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.white
+                                  : Colors.black,
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.pie_chart_outline,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${wallet.items.length} assets',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Icon(
+                                Icons.favorite_outline,
+                                size: 16,
+                                color: Colors.grey[600],
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${likes.length}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: isLiked
+                            ? Colors.blue.withOpacity(0.1)
+                            : Colors.grey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
                         icon: Icon(
-                          isLiked
-                              ? Icons.bookmark_border_sharp
-                              : Icons.bookmark_sharp,
+                          isLiked ? Icons.bookmark : Icons.bookmark_border,
                           size: 24,
-                          color: isLiked
-                              ? Theme.of(context).colorScheme.onSurface
-                              : Colors.grey,
+                          color: isLiked ? Colors.blue : Colors.grey[600],
                         ),
                         tooltip:
-                            isLiked ? 'Unlike Portfolio' : 'Like Portfolio',
+                            isLiked ? 'Remove from saved' : 'Save portfolio',
                         onPressed: () =>
                             _toggleLikePortfolio(portfolio['walletId'], likes),
-                        padding: const EdgeInsets.all(0),
                         constraints: const BoxConstraints(
-                          minWidth: 0,
-                          minHeight: 0,
+                          minWidth: 44,
+                          minHeight: 44,
                         ),
-                      );
-                    },
-                  ),
-                ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -262,14 +397,12 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId == null) return;
 
-    // Hedef kullanıcının sharedPortfolios'unda güncelleme
     final targetDocRef = FirebaseFirestore.instance
         .collection('users')
         .doc(widget.userId)
         .collection('sharedPortfolios')
         .doc(walletId);
 
-    // Mevcut kullanıcının likedPortfolios'unda güncelleme
     final currentUserLikedRef = FirebaseFirestore.instance
         .collection('users')
         .doc(currentUserId)
@@ -279,13 +412,11 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
     final isLiked = likes.contains(currentUserId);
 
     if (isLiked) {
-      // Beğeniyi kaldır
       await targetDocRef.update({
         'likes': FieldValue.arrayRemove([currentUserId])
       });
       await currentUserLikedRef.delete();
     } else {
-      // Beğeni ekle
       await targetDocRef.update({
         'likes': FieldValue.arrayUnion([currentUserId])
       });
@@ -295,7 +426,6 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
       });
     }
 
-    // Verileri yenile
     _loadSharedPortfolios();
     _loadLikedPortfolios();
   }
@@ -338,7 +468,24 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading || _userDoc == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(strokeWidth: 3),
+              const SizedBox(height: 16),
+              Text(
+                'Loading profile...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final nickname = _userDoc!['nickname'];
@@ -347,112 +494,191 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
     final following = (_userDoc!['following'] as List).length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          '$nickname\'s Profile',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            color: Theme.of(context).colorScheme.onPrimary,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 50,
+            floating: false,
+            pinned: true,
+            elevation: 0,
+            leading: Container(
+              margin: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color:
+                    Theme.of(context).scaffoldBackgroundColor.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+                onPressed: () => Navigator.pop(context),
+                color: Theme.of(context).colorScheme.onBackground,
+              ),
+            ),
+            // flexibleSpace: FlexibleSpaceBar(
+            //   title: Text(
+            //     '$nickname\'s Profile',
+            //     style: TextStyle(
+            //       fontWeight: FontWeight.bold,
+            //       fontSize: 20,
+            //       color: Theme.of(context).colorScheme.onBackground,
+            //       letterSpacing: -0.5,
+            //     ),
+            //   ),
+            //   centerTitle: true,
+            // ),
           ),
-        ),
-        centerTitle: true,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 24),
-          onPressed: () => Navigator.pop(context),
-          color: Theme.of(context).colorScheme.onPrimary,
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              // Profile Header
-              Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                color: Theme.of(context).cardTheme.color,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.grey[200],
-                        backgroundImage: NetworkImage(
-                          _userDoc!['profileImageUrl'],
+          SliverToBoxAdapter(
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Profile Header
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardTheme.color,
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color:
+                              Theme.of(context).dividerColor.withOpacity(0.2),
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Text(
-                        nickname,
-                        style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        email,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          _buildStatItem('Followers', followers),
-                          const SizedBox(width: 24),
-                          _buildStatItem('Following', following),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _toggleFollow,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _isFollowing
-                                ? Color(0xFFFF5722)
-                                : Color(0xFF00BCD4),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              side: BorderSide(
-                                color: _isFollowing
-                                    ? Color(0xFFFF5722)
-                                    : Color(0xFF00BCD4),
-                                width: 2,
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          children: [
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.1),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: CircleAvatar(
+                                radius: 60,
+                                backgroundColor: Colors.grey[200],
+                                backgroundImage: NetworkImage(
+                                  _userDoc!['profileImageUrl'],
+                                ),
                               ),
                             ),
-                          ),
-                          child: Text(
-                            _isFollowing ? 'Unfollow' : 'Follow',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                            const SizedBox(height: 20),
+                            Text(
+                              nickname,
+                              style: const TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: -0.5,
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 6),
+                            Text(
+                              email,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildStatItem('Followers', followers),
+                                Container(
+                                  width: 1,
+                                  height: 40,
+                                  color: Theme.of(context)
+                                      .dividerColor
+                                      .withOpacity(0.3),
+                                ),
+                                _buildStatItem('Following', following),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+                            Container(
+                              width: double.infinity,
+                              height: 56,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: _isFollowing
+                                      ? [
+                                          Color(0xFFFF5722),
+                                          Color(0xFFFF5722).withOpacity(0.8)
+                                        ]
+                                      : [
+                                          Color(0xFF00BCD4),
+                                          Color(0xFF00BCD4).withOpacity(0.8)
+                                        ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (_isFollowing
+                                            ? Color(0xFFFF5722)
+                                            : Color(0xFF00BCD4))
+                                        .withOpacity(0.3),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _toggleFollow,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      _isFollowing
+                                          ? Icons.person_remove
+                                          : Icons.person_add,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _isFollowing ? 'Unfollow' : 'Follow',
+                                      style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 32),
+                    // Shared Portfolios Section
+                    _buildPortfolioList(),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              // Shared Portfolios Section
-              _buildPortfolioList(),
-            ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -463,8 +689,9 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
         Text(
           count.toString(),
           style: const TextStyle(
-            fontSize: 18,
+            fontSize: 24,
             fontWeight: FontWeight.bold,
+            letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 4),
@@ -473,6 +700,7 @@ class _ShownProfileScreenState extends State<ShownProfileScreen> {
           style: TextStyle(
             fontSize: 14,
             color: Colors.grey[600],
+            fontWeight: FontWeight.w500,
           ),
         ),
       ],

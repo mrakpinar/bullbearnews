@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/crypto_model.dart';
@@ -63,7 +64,6 @@ class _MarketScreenState extends State<MarketScreen> {
   void _scrollListener() {
     if (_scrollController.position.pixels ==
         _scrollController.position.maxScrollExtent) {
-      // Sayfa sonuna ulaşıldı, daha fazla veri yükle
       _loadMoreData();
     }
   }
@@ -71,7 +71,7 @@ class _MarketScreenState extends State<MarketScreen> {
   Future<void> _loadMoreData() async {
     // Daha fazla veri yükleme mantığı
   }
-  // Favori kriptoları yükle
+
   Future<void> _loadFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -80,13 +80,11 @@ class _MarketScreenState extends State<MarketScreen> {
     });
   }
 
-  // Favori durumunu kaydet
   Future<void> _saveFavorites() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('favoriteCryptos', _favoriteCryptos.toList());
   }
 
-  // Favori durumunu değiştir
   Future<void> _toggleFavorite(String id) async {
     if (mounted) {
       setState(() {
@@ -96,16 +94,13 @@ class _MarketScreenState extends State<MarketScreen> {
           _favoriteCryptos.add(id);
         }
 
-        // Favori durumunu listedeki tüm nesnelere uygula
         for (var crypto in _cryptoList) {
           crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
         }
 
-        // Filtreleme ve sıralama uygula
         _filterCryptoList();
       });
     }
-    // Değişiklikleri kaydet
     await _saveFavorites();
   }
 
@@ -132,8 +127,7 @@ class _MarketScreenState extends State<MarketScreen> {
         _filteredList.sort((a, b) {
           if (a.isFavorite && !b.isFavorite) return -1;
           if (!a.isFavorite && b.isFavorite) return 1;
-          return b.marketCap.compareTo(
-              a.marketCap); // Favoriler arasında marketCap'e göre sırala
+          return b.marketCap.compareTo(a.marketCap);
         });
         break;
     }
@@ -156,7 +150,6 @@ class _MarketScreenState extends State<MarketScreen> {
     final now = DateTime.now();
     if (_lastRefreshTime != null &&
         now.difference(_lastRefreshTime!).inSeconds < 30) {
-      // 30 saniyeden daha kısa sürede yenileme yapmayı engelle
       if (_cachedCryptoList.isNotEmpty) {
         setState(() {
           _cryptoList = List.from(_cachedCryptoList);
@@ -171,7 +164,6 @@ class _MarketScreenState extends State<MarketScreen> {
     try {
       final newData = await _cryptoService.getCryptoData();
 
-      // Favori durumunu kriptolara uygula
       for (var crypto in newData) {
         crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
       }
@@ -184,7 +176,6 @@ class _MarketScreenState extends State<MarketScreen> {
         _filterCryptoList();
       });
     } catch (e) {
-      // Daha anlaşılır hata mesajları
       String userFriendlyError;
       if (e.toString().contains('timeout')) {
         userFriendlyError = 'Connection timeout. Please check your internet.';
@@ -194,7 +185,6 @@ class _MarketScreenState extends State<MarketScreen> {
         userFriendlyError = 'Failed to load data. Please try again.';
       }
 
-      // Hata durumunda cache'den veriyi göster
       if (_cachedCryptoList.isNotEmpty) {
         setState(() {
           _cryptoList = List.from(_cachedCryptoList);
@@ -235,6 +225,95 @@ class _MarketScreenState extends State<MarketScreen> {
     );
   }
 
+  // Crypto ikonları için yerel widget
+  Widget _buildCryptoIcon(CryptoModel crypto) {
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Theme.of(context).cardColor,
+        border: Border.all(
+          color: Theme.of(context).dividerColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: CachedNetworkImage(
+        imageUrl: crypto.image,
+        width: 40,
+        height: 40,
+        fit: BoxFit.contain,
+        placeholder: (context, url) => Container(
+          width: 40,
+          height: 40,
+          decoration: const BoxDecoration(shape: BoxShape.circle),
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+        errorWidget: (context, url, error) {
+          // Fallback olarak crypto simgesi veya harfler göster
+          return Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                colors: [
+                  _getCryptoColor(crypto.symbol),
+                  _getCryptoColor(crypto.symbol).withOpacity(0.7),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                crypto.symbol
+                    .substring(0, crypto.symbol.length >= 2 ? 2 : 1)
+                    .toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          );
+        },
+        httpHeaders: const {
+          'User-Agent': 'Mozilla/5.0 (compatible; BullBearNews/1.0)',
+        },
+        cacheManager: null, // Varsayılan cache manager kullan
+        maxHeightDiskCache: 100,
+        maxWidthDiskCache: 100,
+      ),
+    );
+  }
+
+  // Crypto sembolüne göre renk üret
+  Color _getCryptoColor(String symbol) {
+    final colors = [
+      const Color(0xFFFF6B6B), // Kırmızı
+      const Color(0xFF4ECDC4), // Turkuaz
+      const Color(0xFF45B7D1), // Mavi
+      const Color(0xFF96CEB4), // Yeşil
+      const Color(0xFFFECA57), // Sarı
+      const Color(0xFFFF9FF3), // Pembe
+      const Color(0xFF54A0FF), // Açık mavi
+      const Color(0xFF5F27CD), // Mor
+      const Color(0xFFFF9F43), // Turuncu
+      const Color(0xFF1DD1A1), // Mint yeşili
+    ];
+
+    final hash = symbol.hashCode;
+    return colors[hash.abs() % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -253,12 +332,12 @@ class _MarketScreenState extends State<MarketScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 10.0),
             child: IconButton(
-              icon: const Icon(Icons.refresh_sharp, size: 30), // Refresh icon
+              icon: const Icon(Icons.refresh_sharp, size: 30),
               onPressed: _loadCryptoData,
             ),
           ),
         ],
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
         toolbarHeight: 60,
       ),
@@ -372,7 +451,7 @@ class _MarketScreenState extends State<MarketScreen> {
     return InkWell(
       onTap: () => _navigateToDetail(crypto),
       child: Card(
-        color: Theme.of(context).cardColor, // Kart rengi tema ile uyumlu
+        color: Theme.of(context).cardColor,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -386,21 +465,8 @@ class _MarketScreenState extends State<MarketScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.max,
             children: [
-              // Leading - Crypto image
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: Image.network(
-                  crypto.image,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Icon(
-                      Icons.currency_bitcoin,
-                      size: 40,
-                      color: Colors.grey,
-                    );
-                  },
-                ),
-              ),
+              // Leading - Crypto image (Güncellendi)
+              _buildCryptoIcon(crypto),
 
               const SizedBox(width: 12),
               // Middle - Crypto name, symbol, market cap
@@ -560,7 +626,8 @@ class _MarketScreenState extends State<MarketScreen> {
           });
         },
         backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-        selectedColor: isDarkMode ? Color(0xFF8A2BE2) : Color(0xFF8A2BE2),
+        selectedColor:
+            isDarkMode ? const Color(0xFF8A2BE2) : const Color(0xFF8A2BE2),
         checkmarkColor: isDarkMode ? Colors.black : Colors.white,
       ),
     );

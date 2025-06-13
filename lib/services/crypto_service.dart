@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: depend_on_referenced_packages
+import 'package:dio/dio.dart';
 import '../models/crypto_model.dart';
 
 class CryptoService {
@@ -10,6 +11,7 @@ class CryptoService {
   List<CryptoModel>? _cachedData;
   DateTime? _lastFetchTime;
   bool _isFetching = false;
+  final Dio _dio = Dio();
 
   // Cache süresi (10 dakika)
   final Duration _cacheDuration = const Duration(minutes: 10);
@@ -50,20 +52,37 @@ class CryptoService {
   }
 
   Future<List<CryptoModel>> _fetchFromApi() async {
-    final response = await http.get(
-      Uri.parse(
-          '$baseUrl/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=1'),
-      headers: {'Accept': 'application/json', 'User-Agent': 'BullBearNews/1.0'},
-    ).timeout(const Duration(seconds: 15));
+    try {
+      final response = await _dio.get(
+        '$baseUrl/coins/markets',
+        queryParameters: {
+          'vs_currency': 'usd',
+          'order': 'market_cap_desc',
+          'per_page': '100',
+          'page': '1',
+        },
+        options: Options(
+          headers: {
+            'Accept': 'application/json',
+            'User-Agent': 'BullBearNews/1.0',
+          },
+        ),
+      );
 
-    if (response.statusCode == 200) {
-      List<dynamic> data = jsonDecode(response.body);
-      return data.map((item) => CryptoModel.fromJson(item)).toList();
-    } else if (response.statusCode == 429) {
-      throw Exception('API request limit exceeded. Please try again later.');
-    } else {
-      throw Exception(
-          'Failed to load data. Status code: ${response.statusCode}');
+      if (response.statusCode == 200) {
+        return (response.data as List)
+            .map((item) => CryptoModel.fromJson(item))
+            .toList();
+      } else {
+        throw Exception(
+            'Failed to load data. Status code: ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw Exception('API request limit exceeded. Please try again later.');
+      } else {
+        throw Exception('Failed to load data: ${e.message}');
+      }
     }
   }
 

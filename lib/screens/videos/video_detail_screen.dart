@@ -214,6 +214,7 @@ class _VideoDetailScreenState extends State<VideoDetailScreen> {
               : Colors.white.withOpacity(0.7),
           fontWeight: FontWeight.w400,
           letterSpacing: 0.5,
+          fontFamily: 'Mono',
         ),
       ),
     );

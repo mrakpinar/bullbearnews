@@ -14,7 +14,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
   late final PageController _pageController;
   late AnimationController _animationController;
 
@@ -74,7 +74,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    final primaryColor = theme.primaryColor;
+    final primaryColor = theme.colorScheme.secondary;
     final backgroundColor = isDarkMode
         ? Colors.grey[900]!.withOpacity(1)
         : Colors.white.withOpacity(0.95);
@@ -152,9 +152,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
                 color: isSelected
                     ? isDarkMode
                         ? Colors.white
-                        : primaryColor
+                        : Theme.of(context).colorScheme.primary
                     : isDarkMode
-                        ? Colors.grey[400]
+                        ? primaryColor
                         : Colors.grey[600],
               ),
               if (isSelected)

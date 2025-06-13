@@ -168,15 +168,6 @@ class _CryptoDetailScreenState extends State<CryptoDetailScreen> {
                     width: 60,
                     height: 60,
                     fit: BoxFit.cover,
-                    imageBuilder: (context, imageProvider) => Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: imageProvider,
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
                     placeholder: (context, url) =>
                         const CircularProgressIndicator(),
                     errorWidget: (context, url, error) => const Icon(

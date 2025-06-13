@@ -23,13 +23,6 @@ class SavedNewsList extends StatelessWidget {
         // Header
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Text(
-            'Saved News',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
-          ),
         ),
         ValueListenableBuilder<Box<NewsModel>>(
           valueListenable: Hive.box<NewsModel>('savedNews').listenable(),

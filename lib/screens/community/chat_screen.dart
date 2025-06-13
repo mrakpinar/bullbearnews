@@ -1,5 +1,6 @@
 import 'dart:ui';
 
+import 'package:bullbearnews/screens/profile/shown_profile_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
@@ -151,64 +152,54 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   PreferredSizeWidget _buildAppBar(ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+
     return AppBar(
       title: GestureDetector(
         onTap: _toggleDescription,
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: Text(
-                widget.chatRoom.name,
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
-                overflow: TextOverflow.ellipsis,
+            Text(
+              widget.chatRoom.name,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color:
+                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+                fontFamily: 'DMSerif',
               ),
             ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.info_outline,
-              size: 20,
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[400]
-                  : Colors.grey[600],
+            const SizedBox(
+              width: 8,
             ),
-            AnimatedRotation(
-              turns: _isDescriptionExpanded ? 0.5 : 0,
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                Icons.keyboard_arrow_down,
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[400]
-                    : Colors.grey[600],
-                size: 20,
-              ),
-            ),
+            if (_isDescriptionExpanded)
+              const Icon(Icons.keyboard_arrow_up_rounded, size: 28)
+            else
+              const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
           ],
         ),
       ),
       leading: IconButton(
+        onPressed: () {
+          Navigator.pop(context);
+        },
         icon: Icon(
-          Icons.arrow_back_ios_new_rounded,
-          color: Theme.of(context).colorScheme.onPrimary,
-          size: 24,
+          Icons.arrow_back_ios_new_sharp,
         ),
-        onPressed: () => Navigator.of(context).pop(),
       ),
-      centerTitle: true,
+      backgroundColor:
+          isDark ? const Color(0xFF393E46) : const Color(0xFF948979),
+      iconTheme: IconThemeData(
+        color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+      ),
       elevation: 0,
       actions: [
         IconButton(
           onPressed: _leaveRoom,
-          icon: const Icon(
+          icon: Icon(
             Icons.exit_to_app_sharp,
-            color: Colors.redAccent,
-            size: 24,
           ),
-          tooltip: 'Leave Room',
-        ),
+        )
       ],
     );
   }
@@ -408,7 +399,6 @@ class _MessageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
-      // Performance optimization
       child: Opacity(
         opacity: hasJoinedRoom ? 1.0 : 1,
         child: BackdropFilter(
@@ -424,7 +414,7 @@ class _MessageCard extends StatelessWidget {
                   ? MainAxisAlignment.end
                   : MainAxisAlignment.start,
               children: [
-                if (!isCurrentUser) _buildAvatar(),
+                if (!isCurrentUser) _buildAvatar(context),
                 _buildMessageBubble(context),
               ],
             ),
@@ -434,30 +424,40 @@ class _MessageCard extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar() {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: colorScheme.primary.withOpacity(0.2),
-        backgroundImage: message.userProfileImage != null
-            ? NetworkImage(
-                message.userProfileImage!,
-                scale: 1.5,
-              )
-            : null,
-        child: message.userProfileImage == null
-            ? Text(
-                message.username.isNotEmpty
-                    ? message.username[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                  color: colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              )
-            : null,
+  Widget _buildAvatar(BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShownProfileScreen(userId: message.userId),
+          ),
+        );
+      },
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: CircleAvatar(
+          radius: 16,
+          backgroundColor: colorScheme.primary.withOpacity(0.2),
+          backgroundImage: message.userProfileImage != null
+              ? NetworkImage(
+                  message.userProfileImage!,
+                  scale: 1.5,
+                )
+              : null,
+          child: message.userProfileImage == null
+              ? Text(
+                  message.username.isNotEmpty
+                      ? message.username[0].toUpperCase()
+                      : '?',
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                )
+              : null,
+        ),
       ),
     );
   }
@@ -472,15 +472,29 @@ class _MessageCard extends StatelessWidget {
             isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           if (!isCurrentUser)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text(
-                message.username,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey[200]
-                      : Colors.grey[800],
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        ShownProfileScreen(userId: message.userId),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  message.username,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.grey[200]
+                        : Colors.grey[800],
+                    fontSize: 16,
+                    height: 1.2,
+                    letterSpacing: 1.2,
+                  ),
                 ),
               ),
             ),
@@ -503,10 +517,6 @@ class _MessageCard extends StatelessWidget {
                     : const Radius.circular(12),
               ),
             ),
-            // width: double.infinity,
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.of(context).size.width * 0.75,
-            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -518,9 +528,10 @@ class _MessageCard extends StatelessWidget {
                         : theme.brightness == Brightness.dark
                             ? Colors.grey[200]
                             : Colors.grey[800],
-                    fontSize: 15,
+                    fontSize: 16,
                     height: 1.4,
                     fontWeight: FontWeight.w400,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -663,76 +674,62 @@ class _MessageInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? Colors.grey[900]
-            : Colors.white,
+        color: isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
         border: Border(
           top: BorderSide(
-            color: theme.brightness == Brightness.dark
-                ? Colors.grey[800]!
-                : Colors.grey[200]!,
-            width: 1,
+            color: isDark ? Colors.black26 : Colors.white30,
           ),
         ),
       ),
-      child: SafeArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey[800]
-                      : Colors.grey[100],
-                  borderRadius: BorderRadius.circular(24),
-                ),
-                child: TextField(
-                  controller: controller,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey[100]
-                        : Colors.grey[800],
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Type a message...',
-                    hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.grey[400]
-                          : Colors.grey[500],
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                  maxLines: 4,
-                  minLines: 1,
-                  onSubmitted: (_) => onSend(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Container(
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
               decoration: BoxDecoration(
-                color: colorScheme.primary,
-                shape: BoxShape.circle,
+                color: isDark ? Colors.black26 : Colors.white70,
+                borderRadius: BorderRadius.circular(24),
               ),
-              child: IconButton(
-                onPressed: onSend,
-                icon: const Icon(
-                  Icons.send_rounded,
-                  color: Colors.white,
-                  size: 20,
+              child: TextField(
+                controller: controller,
+                style: TextStyle(
+                  fontFamily: 'DMSerif',
+                  color: isDark ? Colors.white : Colors.black,
                 ),
-                padding: const EdgeInsets.all(12),
+                decoration: InputDecoration(
+                  hintText: 'Type a message...',
+                  hintStyle: TextStyle(
+                    fontFamily: 'DMSerif',
+                    color: isDark ? Colors.white54 : Colors.black54,
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                ),
+                onSubmitted: (_) => onSend(),
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFF393E46),
+                  const Color(0xFF948979),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              onPressed: onSend,
+              icon: const Icon(Icons.send, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
