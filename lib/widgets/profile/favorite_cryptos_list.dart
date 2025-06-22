@@ -1,7 +1,7 @@
 import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../models/crypto_model.dart';
+import '../../../models/crypto_model.dart';
 
 class FavoriteCryptosList extends StatefulWidget {
   final bool isLoading;

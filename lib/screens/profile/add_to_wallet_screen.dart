@@ -1,3 +1,4 @@
+import 'package:bullbearnews/screens/auth/auth_wrapper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -345,7 +346,10 @@ class _AddToWalletScreenState extends State<AddToWalletScreen> {
         'items': FieldValue.arrayUnion([newItem.toJson()])
       });
 
-      if (mounted) Navigator.pop(context, true);
+      if (mounted) {
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => AuthWrapper()));
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

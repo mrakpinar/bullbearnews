@@ -106,7 +106,7 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
   }
 
   Future<void> _addToWallet() async {
-    final result = await Navigator.push(
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => AddToWalletScreen(),

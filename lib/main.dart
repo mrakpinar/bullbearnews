@@ -120,6 +120,7 @@ class _MyAppState extends State<MyApp> {
         onSecondary: Colors.black,
         onBackground: AppColors.darkText,
         onSurface: AppColors.darkText,
+        tertiary: AppColors.lightBackground,
       ),
       cardTheme: CardThemeData(
         color: AppColors.lightCard,
@@ -150,6 +151,7 @@ class _MyAppState extends State<MyApp> {
         onSecondary: Colors.white,
         onBackground: AppColors.lightText,
         onSurface: AppColors.lightText,
+        tertiary: AppColors.lightBackground,
       ),
       cardTheme: CardThemeData(
         color: AppColors.darkCard,

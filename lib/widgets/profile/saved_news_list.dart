@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import '../../models/news_model.dart';
-import '../../screens/home/new_details_screen.dart';
+import '../../../models/news_model.dart';
+import '../../../screens/home/new_details_screen.dart';
 
 class SavedNewsList extends StatelessWidget {
   final bool isLoading;

@@ -1,4 +1,4 @@
-import 'package:bullbearnews/widgets/wallet_summary_card.dart';
+import 'package:bullbearnews/widgets/profile/wallet_summary_card.dart';
 import 'package:flutter/material.dart';
 import 'package:bullbearnews/models/crypto_model.dart';
 import 'package:bullbearnews/models/wallet_model.dart';
