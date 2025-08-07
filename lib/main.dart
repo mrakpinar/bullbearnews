@@ -1,10 +1,14 @@
+// ignore: depend_on_referenced_packages
+// import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:bullbearnews/connectivity_service.dart';
 import 'package:bullbearnews/constants/colors.dart';
 import 'package:bullbearnews/models/news_model.dart';
+import 'package:bullbearnews/screens/auth/email_verification_screen.dart';
 import 'package:bullbearnews/screens/home/home_screen.dart';
 import 'package:bullbearnews/services/local_storage_service.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:provider/provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -12,11 +16,30 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'firebase_options.dart';
 import 'screens/auth/auth_wrapper.dart';
 import 'providers/theme_provider.dart';
+import 'services/push_notification_service.dart';
+import 'utils/notification_navigation_handler.dart';
+
+// Top-level function for background message handling
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  print('Handling a background message: ${message.messageId}');
+  print('Background message data: ${message.data}');
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Hive ve Firebase başlatma
+  // FlutterNativeSplash.preserve(
+  //     widgetsBinding: WidgetsFlutterBinding.ensureInitialized());
+
+  // Initialize Firebase first
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  // Set background message handler
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+  // Initialize other services
   await _initializeApp();
 
   runApp(
@@ -31,16 +54,23 @@ Future<void> main() async {
 
 Future<void> _initializeApp() async {
   try {
-    await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform);
+    // Hive initialization
     await Hive.initFlutter();
     Hive.registerAdapter(NewsModelAdapter());
     await LocalStorageService.init();
+
+    // Initialize Push Notifications
+    await PushNotificationService.initialize();
+
+    print('App initialization completed successfully');
   } catch (e) {
     print('Initialization error: $e');
     try {
       await Hive.deleteBoxFromDisk('savedNews');
       await LocalStorageService.init();
+
+      // Retry push notification initialization
+      await PushNotificationService.initialize();
     } catch (e) {
       print('Recovery failed: $e');
     }
@@ -61,10 +91,14 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _checkConnection();
+    _setupPushNotifications();
+
     ConnectivityService.connectivityStream.listen((result) {
       // ignore: unrelated_type_equality_checks
       _updateConnectionStatus(result != ConnectivityResult.none);
     });
+
+    // FlutterNativeSplash.remove();
   }
 
   Future<void> _checkConnection() async {
@@ -89,6 +123,50 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  void _setupPushNotifications() async {
+    try {
+      // Request permissions
+      await PushNotificationService.requestPermission();
+
+      // Handle initial message when app is opened from notification
+      RemoteMessage? initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null) {
+        print('App opened from notification: ${initialMessage.data}');
+        // Wait a bit for the app to fully load
+        await Future.delayed(const Duration(seconds: 2));
+        if (mounted) {
+          await NotificationNavigationHandler.handleNotificationTap(
+              initialMessage.data);
+        }
+      }
+
+      // Handle message when app is in background and user taps on notification
+      FirebaseMessaging.onMessageOpenedApp.listen((message) async {
+        print('Notification tapped while app in background: ${message.data}');
+        if (mounted) {
+          await NotificationNavigationHandler.handleNotificationTap(
+              message.data);
+        }
+      });
+
+      // Handle foreground messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Received a message while app is in foreground!');
+        print('Message data: ${message.data}');
+
+        if (message.notification != null) {
+          print('Message notification: ${message.notification!.title}');
+          print('Message body: ${message.notification!.body}');
+        }
+      });
+
+      print('Push notifications setup completed');
+    } catch (e) {
+      print('Error setting up push notifications: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -96,12 +174,16 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       title: 'BullBearNews',
       debugShowCheckedModeBanner: false,
+      navigatorKey:
+          NotificationNavigationHandler.navigatorKey, // Add navigator key
       theme: _buildLightTheme(),
       darkTheme: _buildDarkTheme(),
       themeMode: themeProvider.themeMode,
       home: AuthWrapper(showOfflineBanner: !_isOnline),
       routes: {
         '/home': (context) => HomeScreen(),
+        '/main': (context) => AuthWrapper(), // Bu satırı ekleyin
+        '/email-verification': (context) => EmailVerificationScreen(),
         '/auth': (context) => AuthWrapper(),
       },
     );

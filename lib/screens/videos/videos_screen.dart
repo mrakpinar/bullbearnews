@@ -11,17 +11,24 @@ class VideosScreen extends StatefulWidget {
 }
 
 class _VideosScreenState extends State<VideosScreen>
-    with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final VideoService _videoService = VideoService();
   List<VideoModel> _allVideos = [];
   List<VideoModel> _filteredVideos = [];
-  final List<String> _categories = [
-    'All',
-    'Trending',
-    'New',
-    'Teknoloji',
-    'Sağlık'
+
+  // Backend'deki video kategorilerine göre güncellendi
+  final List<Map<String, String>> _categories = [
+    {'name': 'All', 'icon': '🎬'},
+    {'name': 'Tutorial', 'icon': '📚'},
+    {'name': 'News', 'icon': '📰'},
+    {'name': 'Analysis', 'icon': '📊'},
+    {'name': 'Interview', 'icon': '🎤'},
+    {'name': 'Review', 'icon': '⭐'},
+    {'name': 'Trading', 'icon': '📈'},
+    {'name': 'DeFi', 'icon': '🏦'},
+    {'name': 'NFT', 'icon': '🎨'},
   ];
+
   String _selectedCategory = 'All';
   bool _isLoading = true;
 
@@ -45,9 +52,6 @@ class _VideosScreenState extends State<VideosScreen>
   static const double _scrollThreshold = 50.0;
 
   @override
-  bool get wantKeepAlive => true;
-
-  @override
   void initState() {
     super.initState();
     _initializeAnimations();
@@ -57,15 +61,15 @@ class _VideosScreenState extends State<VideosScreen>
 
   void _initializeAnimations() {
     _headerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _categoryAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
     _hideAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
 
@@ -82,6 +86,7 @@ class _VideosScreenState extends State<VideosScreen>
           parent: _hideAnimationController, curve: Curves.easeInOut),
     );
 
+    // Animasyonları başlat
     _headerAnimationController.forward();
     _hideAnimationController.forward();
     Future.delayed(const Duration(milliseconds: 300), () {
@@ -166,9 +171,19 @@ class _VideosScreenState extends State<VideosScreen>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Videolar yüklenirken hata oluştu: ${e.toString()}'),
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Failed to load videos: ${e.toString()}')),
+              ],
+            ),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         );
       }
@@ -191,10 +206,6 @@ class _VideosScreenState extends State<VideosScreen>
               video.category.toLowerCase() == _selectedCategory.toLowerCase())
           .toList();
     }
-
-    debugPrint('Seçilen kategori: $_selectedCategory');
-    debugPrint('Tüm video sayısı: ${_allVideos.length}');
-    debugPrint('Filtrelenmiş video sayısı: ${_filteredVideos.length}');
   }
 
   void _onCategorySelected(String category) {
@@ -248,7 +259,6 @@ class _VideosScreenState extends State<VideosScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
@@ -308,10 +318,10 @@ class _VideosScreenState extends State<VideosScreen>
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                gradient: const LinearGradient(
+                                gradient: LinearGradient(
                                   colors: [
-                                    Color(0xFF393E46),
-                                    Color(0xFF393E46),
+                                    const Color(0xFF393E46),
+                                    const Color(0xFF948979),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
@@ -319,12 +329,12 @@ class _VideosScreenState extends State<VideosScreen>
                               child: const Icon(
                                 Icons.play_circle_fill,
                                 color: Color(0xFFDFD0B8),
-                                size: 20,
+                                size: 18,
                               ),
                             ),
                             const SizedBox(width: 12),
                             Text(
-                              'Videos',
+                              'Crypto Videos',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.w800,
@@ -341,7 +351,7 @@ class _VideosScreenState extends State<VideosScreen>
                         Row(
                           children: [
                             Text(
-                              'Watch the latest video content',
+                              'Educational crypto content 🎥',
                               style: TextStyle(
                                 fontSize: 14,
                                 color: isDark
@@ -395,7 +405,7 @@ class _VideosScreenState extends State<VideosScreen>
           child: Opacity(
             opacity: _categoryAnimation.value,
             child: Container(
-              height: 50,
+              height: 58,
               margin: const EdgeInsets.only(bottom: 16),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -403,16 +413,18 @@ class _VideosScreenState extends State<VideosScreen>
                 itemCount: _categories.length,
                 itemBuilder: (context, index) {
                   final category = _categories[index];
-                  final isSelected = category == _selectedCategory;
+                  final categoryName = category['name']!;
+                  final categoryIcon = category['icon']!;
+                  final isSelected = categoryName == _selectedCategory;
 
                   int categoryCount = 0;
-                  if (category == 'All') {
+                  if (categoryName == 'All') {
                     categoryCount = _allVideos.length;
                   } else {
                     categoryCount = _allVideos
                         .where((video) =>
                             video.category.toLowerCase() ==
-                            category.toLowerCase())
+                            categoryName.toLowerCase())
                         .length;
                   }
 
@@ -422,17 +434,17 @@ class _VideosScreenState extends State<VideosScreen>
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => _onCategorySelected(category),
-                        borderRadius: BorderRadius.circular(25),
+                        onTap: () => _onCategorySelected(categoryName),
+                        borderRadius: BorderRadius.circular(28),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                              horizontal: 18, vertical: 12),
                           decoration: BoxDecoration(
                             gradient: isSelected
-                                ? const LinearGradient(
+                                ? LinearGradient(
                                     colors: [
-                                      Color(0xFF393E46),
-                                      Color(0xFF393E46),
+                                      const Color(0xFF393E46),
+                                      const Color(0xFF948979),
                                     ],
                                   )
                                 : null,
@@ -441,7 +453,7 @@ class _VideosScreenState extends State<VideosScreen>
                                     ? const Color(0xFF393E46).withOpacity(0.3)
                                     : Colors.white.withOpacity(0.7))
                                 : null,
-                            borderRadius: BorderRadius.circular(25),
+                            borderRadius: BorderRadius.circular(28),
                             border: Border.all(
                               color: isSelected
                                   ? Colors.transparent
@@ -451,12 +463,29 @@ class _VideosScreenState extends State<VideosScreen>
                                           .withOpacity(0.2)),
                               width: 1,
                             ),
+                            boxShadow: isSelected
+                                ? [
+                                    BoxShadow(
+                                      color: const Color(0xFF948979)
+                                          .withOpacity(0.3),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                category,
+                                categoryIcon,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                categoryName,
                                 style: TextStyle(
                                   color: isSelected
                                       ? const Color(0xFFDFD0B8)
@@ -521,19 +550,43 @@ class _VideosScreenState extends State<VideosScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF393E46).withOpacity(0.1),
+                    const Color(0xFF948979).withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                ),
+                strokeWidth: 3,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              'Loading videos...',
+              'Loading crypto videos...',
               style: TextStyle(
                 color:
                     isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'DMSerif',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '🎥 Educational content loading',
+              style: TextStyle(
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontSize: 14,
+                fontFamily: 'DMSerif',
               ),
             ),
           ],
@@ -546,33 +599,88 @@ class _VideosScreenState extends State<VideosScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.video_library_outlined,
-              size: 64,
-              color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF393E46).withOpacity(0.1),
+                    const Color(0xFF948979).withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                Icons.video_library_outlined,
+                size: 64,
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               _selectedCategory == 'All'
-                  ? 'No videos available'
-                  : 'No videos in $_selectedCategory',
+                  ? 'No crypto videos available'
+                  : 'No ${_selectedCategory.toLowerCase()} videos',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color:
                     isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontFamily: 'DMSerif',
               ),
             ),
             const SizedBox(height: 8),
             Text(
               _selectedCategory == 'All'
-                  ? 'Check back later for new content'
-                  : 'Try selecting a different category',
+                  ? '📺 Check back later for new content'
+                  : '🔄 Try selecting a different category',
               style: TextStyle(
                 fontSize: 14,
                 color: isDark
                     ? const Color(0xFF948979).withOpacity(0.7)
                     : const Color(0xFF393E46).withOpacity(0.7),
+                fontFamily: 'DMSerif',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _loadVideos(refresh: true),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF393E46),
+                        const Color(0xFF948979),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.refresh_rounded,
+                        color: const Color(0xFFDFD0B8),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Refresh Videos',
+                        style: TextStyle(
+                          color: const Color(0xFFDFD0B8),
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'DMSerif',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -585,6 +693,8 @@ class _VideosScreenState extends State<VideosScreen>
       color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
       backgroundColor:
           isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
+      strokeWidth: 3,
+      displacement: 40,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

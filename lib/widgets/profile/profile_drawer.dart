@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:bullbearnews/screens/profile/settings_screen.dart';
-import 'package:bullbearnews/screens/profile/wallets_screen.dart';
+import 'package:bullbearnews/screens/profile/drawer/settings/settings_screen.dart';
+import 'package:bullbearnews/screens/profile/wallet/wallets_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileDrawer extends StatefulWidget {
   final String? profileImageUrl;
@@ -621,7 +623,7 @@ class _ProfileDrawerState extends State<ProfileDrawer>
                 gradient: LinearGradient(
                   colors: [
                     Colors.red.withOpacity(0.1),
-                    Colors.red.withOpacity(0.05),
+                    Colors.red.withOpacity(0.2),
                   ],
                 ),
                 border: Border.all(
@@ -717,54 +719,418 @@ class _ProfileDrawerState extends State<ProfileDrawer>
   Future<void> _showHelpDialog(BuildContext context) async {
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFf093fb), Color(0xFFf5576c)],
-                ),
-                borderRadius: BorderRadius.circular(12),
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(20),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF393E46)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
               ),
-              child: const Icon(
-                Icons.help_outline_rounded,
-                color: Colors.white,
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Header
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF393E46), Color(0xFF948979)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(24),
+                    topRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.support_agent_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Help & Support',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontFamily: 'DMSerif',
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'We\'re here to help you!',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white.withOpacity(0.8),
+                              fontFamily: 'DMSerif',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white.withOpacity(0.8),
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Content
+              Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info Section
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFF222831).withOpacity(0.5)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: const Color(0xFF948979).withOpacity(0.2),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.info_outline_rounded,
+                                color: const Color(0xFF948979),
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Need assistance?',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFFDFD0B8)
+                                      : const Color(0xFF222831),
+                                  fontFamily: 'DMSerif',
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'For any questions, feedback, or technical support, our team is ready to assist you. We typically respond within 24 hours.',
+                            style: TextStyle(
+                              fontSize: 14,
+                              height: 1.6,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? const Color(0xFFDFD0B8).withOpacity(0.8)
+                                  : const Color(0xFF666666),
+                              fontFamily: 'DMSerif',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Contact Section
+                    Text(
+                      'Contact Options',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? const Color(0xFFDFD0B8)
+                            : const Color(0xFF222831),
+                        fontFamily: 'DMSerif',
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Email Button - DÜZELTME
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () async {
+                          // Dialog'u kapat ve email'i aç
+                          Navigator.pop(context);
+                          await _launchEmail();
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                const Color(0xFF948979),
+                                const Color(0xFF948979).withOpacity(0.8),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF948979).withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.email_outlined,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Email Support',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                        fontFamily: 'DMSerif',
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    const Text(
+                                      'support@bullbearnews.com',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.white,
+                                        fontFamily: 'DMSerif',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                Icons.arrow_forward_ios_rounded,
+                                color: Colors.white.withOpacity(0.8),
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Quick Actions - DÜZELTME
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildQuickAction(
+                            context,
+                            'Report Bug',
+                            Icons.bug_report_outlined,
+                            Colors.red,
+                            () async {
+                              Navigator.pop(context);
+                              await _launchEmail(subject: 'Bug Report');
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildQuickAction(
+                            context,
+                            'Feedback',
+                            Icons.feedback_outlined,
+                            Colors.blue,
+                            () async {
+                              Navigator.pop(context);
+                              await _launchEmail(subject: 'App Feedback');
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // Footer
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF222831).withOpacity(0.3)
+                      : const Color(0xFFF8F9FA),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.favorite,
+                      color: Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Made with love for crypto enthusiasts',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: const Color(0xFF948979),
+                        fontFamily: 'DMSerif',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickAction(
+    BuildContext context,
+    String title,
+    IconData icon,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: color.withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: color,
                 size: 20,
               ),
-            ),
-            const SizedBox(width: 12),
-            const Text('Help & Feedback'),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                  fontFamily: 'DMSerif',
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+// Email launcher fonksiyonu - DÜZELTME
+  Future<void> _launchEmail({String? subject}) async {
+    final String emailSubject = subject ?? 'Support Request';
+    final Uri emailUri = Uri(
+      scheme: 'mailto',
+      path: 'support@bullbearnews.com',
+      query:
+          'subject=${Uri.encodeComponent(emailSubject)}&body=${Uri.encodeComponent('Hello BullBearNews Team,\n\n')}',
+    );
+
+    try {
+      if (await canLaunchUrl(emailUri)) {
+        await launchUrl(emailUri, mode: LaunchMode.externalApplication);
+      } else {
+        // Fallback: Show snackbar with email
+        _showEmailFallback('support@bullbearnews.com');
+      }
+    } catch (e) {
+      _showEmailFallback('support@bullbearnews.com');
+    }
+  }
+
+// Fallback method - YENİ
+  void _showEmailFallback(String email) {
+    // Context gerektiği için bu method'u ProfileDrawer class'ı içinde tanımlayın
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.email, color: Colors.white),
+            SizedBox(width: 8),
+            Expanded(child: Text('Please email us at: $email')),
           ],
         ),
-        content: const Text(
-          'For any questions or feedback, please contact us at support@bullbearnews.com',
-          style: TextStyle(
-            fontSize: 16,
-            height: 1.4,
-          ),
+        backgroundColor: Color(0xFF948979),
+        duration: Duration(seconds: 4),
+        action: SnackBarAction(
+          label: 'COPY',
+          textColor: Colors.white,
+          onPressed: () {
+            Clipboard.setData(ClipboardData(text: email));
+          },
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            style: TextButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: const Text(
-              'OK',
-              style: TextStyle(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -793,7 +1159,11 @@ class _ProfileDrawerState extends State<ProfileDrawer>
               ),
             ),
             const SizedBox(width: 12),
-            const Text('Logout'),
+            const Text(
+              'Logout',
+              style:
+                  TextStyle(fontWeight: FontWeight.w600, color: Colors.black),
+            ),
           ],
         ),
         content: const Text(
@@ -801,6 +1171,7 @@ class _ProfileDrawerState extends State<ProfileDrawer>
           style: TextStyle(
             fontSize: 16,
             height: 1.4,
+            color: Colors.black54,
           ),
         ),
         actions: [

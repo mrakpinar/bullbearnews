@@ -1,5 +1,6 @@
 import 'package:bullbearnews/models/wallet_model.dart';
-import 'package:bullbearnews/screens/profile/wallet_detail_screen.dart';
+import 'package:bullbearnews/screens/profile/wallet/wallet_detail_screen.dart';
+import 'package:bullbearnews/services/notification_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ class ShownProfileScreen extends StatefulWidget {
 
 class _ShownProfileScreenState extends State<ShownProfileScreen>
     with SingleTickerProviderStateMixin {
+  final NotificationService _notificationService = NotificationService();
   DocumentSnapshot? _userDoc;
   bool _isFollowing = false;
   bool _isLoading = true;
@@ -374,8 +376,8 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                         ),
                         tooltip:
                             isLiked ? 'Remove from saved' : 'Save portfolio',
-                        onPressed: () =>
-                            _toggleLikePortfolio(portfolio['walletId'], likes),
+                        onPressed: () => _toggleLikePortfolio(
+                            portfolio['walletId'], likes, wallet.name),
                         constraints: const BoxConstraints(
                           minWidth: 44,
                           minHeight: 44,
@@ -393,7 +395,7 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
   }
 
   Future<void> _toggleLikePortfolio(
-      String walletId, List<dynamic> likes) async {
+      String walletId, List<dynamic> likes, String walletName) async {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId == null) return;
 
@@ -424,6 +426,10 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
         'ownerId': widget.userId,
         'likedAt': FieldValue.serverTimestamp(),
       });
+
+      // Send like notification to portfolio owner
+      await _notificationService.sendLikePortfolioNotification(
+          widget.userId, walletName);
     }
 
     _loadSharedPortfolios();
@@ -449,6 +455,9 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
       await currentRef.update({
         'following': FieldValue.arrayRemove([widget.userId])
       });
+
+      // Send unfollow notification
+      // await _notificationService.sendUnfollowNotification(widget.userId);
     } else {
       await targetRef.update({
         'followers': FieldValue.arrayUnion([currentUserId])
@@ -456,6 +465,9 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
       await currentRef.update({
         'following': FieldValue.arrayUnion([widget.userId])
       });
+
+      // Send follow notification
+      await _notificationService.sendFollowNotification(widget.userId);
     }
 
     setState(() {
@@ -490,6 +502,7 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
 
     final nickname = _userDoc!['nickname'];
     final email = _userDoc!['email'];
+    final bio = _userDoc!['bio'] ?? ''; // Bio alanını al
     final followers = (_userDoc!['followers'] as List).length;
     final following = (_userDoc!['following'] as List).length;
 
@@ -515,18 +528,6 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                 color: Theme.of(context).colorScheme.onBackground,
               ),
             ),
-            // flexibleSpace: FlexibleSpaceBar(
-            //   title: Text(
-            //     '$nickname\'s Profile',
-            //     style: TextStyle(
-            //       fontWeight: FontWeight.bold,
-            //       fontSize: 20,
-            //       color: Theme.of(context).colorScheme.onBackground,
-            //       letterSpacing: -0.5,
-            //     ),
-            //   ),
-            //   centerTitle: true,
-            // ),
           ),
           SliverToBoxAdapter(
             child: FadeTransition(
@@ -566,13 +567,23 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                                 radius: 60,
                                 backgroundColor: Colors.grey[200],
                                 backgroundImage: NetworkImage(
-                                  _userDoc!['profileImageUrl'],
+                                  _userDoc!['profileImageUrl'] ?? '',
                                 ),
+                                child: _userDoc!['profileImageUrl'] == null ||
+                                        _userDoc!['profileImageUrl']
+                                            .toString()
+                                            .isEmpty
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 60,
+                                        color: Colors.grey[400],
+                                      )
+                                    : null,
                               ),
                             ),
                             const SizedBox(height: 20),
                             Text(
-                              nickname,
+                              nickname ?? 'No nickname',
                               style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
@@ -581,13 +592,47 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              email,
+                              email ?? 'No email',
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.grey[600],
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
+
+                            // Bio Section - YENİ EKLENEN
+                            if (bio.isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).brightness ==
+                                          Brightness.dark
+                                      ? const Color(0xFF222831).withOpacity(0.3)
+                                      : Colors.white.withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFF948979)
+                                        .withOpacity(0.2),
+                                  ),
+                                ),
+                                child: Text(
+                                  bio,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Theme.of(context).brightness ==
+                                            Brightness.dark
+                                        ? const Color(0xFFDFD0B8)
+                                        : const Color(0xFF222831),
+                                    fontFamily: 'DMSerif',
+                                    height: 1.4,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ],
+
                             const SizedBox(height: 24),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,

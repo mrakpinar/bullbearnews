@@ -1,18 +1,19 @@
 import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../models/crypto_model.dart';
 
 class FavoriteCryptosList extends StatefulWidget {
   final bool isLoading;
   final List<CryptoModel> favoriteCryptos;
   final VoidCallback onRefresh;
+  final Function(CryptoModel)? onRemoveFavorite;
 
   const FavoriteCryptosList({
     super.key,
     required this.isLoading,
     required this.favoriteCryptos,
     required this.onRefresh,
+    this.onRemoveFavorite,
   });
 
   @override
@@ -23,59 +24,188 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
   Future<void> _showRemoveFavoriteDialog(CryptoModel crypto) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // User must tap button
+      barrierDismissible: false,
       builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
         return AlertDialog(
-          title: const Text('Remove Favorite'),
+          backgroundColor: isDark ? const Color(0xFF393E46) : Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.star_border_outlined,
+                  color: Colors.red.shade600,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Remove Favorite',
+                  style: TextStyle(
+                    color: isDark ? Colors.white : const Color(0xFF222831),
+                    fontFamily: 'DMSerif',
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
           content: SingleChildScrollView(
-            child: ListBody(
-              children: <Widget>[
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF222831).withOpacity(0.5)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          crypto.image,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade300,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(
+                                Icons.currency_bitcoin,
+                                color: Colors.grey.shade600,
+                                size: 20,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              crypto.name,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: isDark ? Colors.white : Colors.black,
+                              ),
+                            ),
+                            Text(
+                              crypto.symbol.toUpperCase(),
+                              style: TextStyle(
+                                color: isDark
+                                    ? Colors.grey[400]
+                                    : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Text(
-                    'Are you sure you want to remove ${crypto.name} from your favorites?'),
+                  'Are you sure you want to remove this cryptocurrency from your favorites? This action will sync across all your devices.',
+                  style: TextStyle(
+                    color: isDark ? Colors.grey[300] : const Color(0xFF393E46),
+                    fontSize: 14,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop(); // Dismiss dialog
-              },
-            ),
-            TextButton(
-              child: const Text('Remove', style: TextStyle(color: Colors.red)),
-              onPressed: () {
-                Navigator.of(context).pop(); // Dismiss dialog
-                _removeFavorite(crypto);
-              },
+          actionsPadding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      backgroundColor:
+                          isDark ? Colors.grey[800] : Colors.grey[200],
+                      foregroundColor: isDark ? Colors.white : Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text('Cancel'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      if (widget.onRemoveFavorite != null) {
+                        widget.onRemoveFavorite!(crypto);
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.white,
+                        ),
+                        SizedBox(width: 8),
+                        Text('Remove'),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         );
       },
-    );
-  }
-
-  Future<void> _removeFavorite(CryptoModel crypto) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // Mevcut favori coinleri al
-    List<String> favoriteIds = prefs.getStringList('favoriteCryptos') ?? [];
-
-    // Coin'i favorilerden çıkar
-    favoriteIds.remove(crypto.id);
-
-    // Güncellenmiş listeyi kaydet
-    await prefs.setStringList('favoriteCryptos', favoriteIds);
-
-    // Refresh çağrısı
-    widget.onRefresh();
-
-    // Snackbar ile bilgilendirme
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${crypto.name} removed from favorites'),
-        duration: const Duration(seconds: 2),
-      ),
     );
   }
 
@@ -101,7 +231,6 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
     return _buildCryptoList(context, isDarkMode);
   }
 
@@ -116,10 +245,17 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
           padding: const EdgeInsets.all(20.0),
           child: Column(
             children: [
-              Icon(
-                Icons.star_border,
-                size: 64,
-                color: Colors.grey,
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.star_border_rounded,
+                  size: 48,
+                  color: Colors.grey,
+                ),
               ),
               const SizedBox(height: 16),
               Text(
@@ -128,7 +264,18 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
                   color: Colors.grey,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
+                  fontFamily: 'DMSerif',
                 ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Add some cryptocurrencies to your favorites\nfrom the market screen',
+                style: TextStyle(
+                  color: Colors.grey.shade600,
+                  fontSize: 14,
+                  fontFamily: 'DMSerif',
+                ),
+                textAlign: TextAlign.center,
               ),
             ],
           ),
@@ -143,117 +290,228 @@ class _FavoriteCryptosListState extends State<FavoriteCryptosList> {
       itemBuilder: (context, index) {
         final crypto = widget.favoriteCryptos[index];
         final isPositive = crypto.priceChangePercentage24h >= 0;
+        final screenWidth = MediaQuery.of(context).size.width;
+        final isSmallScreen = screenWidth < 400;
 
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 12),
-          elevation: 2,
+          decoration: BoxDecoration(
+            color: isDarkMode
+                ? const Color(0xFF393E46).withOpacity(0.3)
+                : Colors.white.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isDarkMode
+                  ? Colors.grey.shade700.withOpacity(0.3)
+                  : Colors.grey.shade300.withOpacity(0.5),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
           child: ListTile(
-            leading: Image.network(
-              crypto.image,
-              height: 40,
-              width: 40,
-              fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const SizedBox(
-                  height: 40,
-                  width: 40,
-                  child: Center(child: CircularProgressIndicator()),
-                );
-              },
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.currency_bitcoin, size: 40);
-              },
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 16 : 20,
+              vertical: isSmallScreen ? 8 : 12,
+            ),
+            leading: Container(
+              width: isSmallScreen ? 40 : 45,
+              height: isSmallScreen ? 40 : 45,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.grey.shade300.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(11),
+                child: Image.network(
+                  crypto.image,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: const Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.shade200,
+                      child: Icon(
+                        Icons.currency_bitcoin,
+                        size: isSmallScreen ? 24 : 28,
+                        color: Colors.grey.shade600,
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
             title: Row(
               children: [
-                Text(
-                  crypto.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+                Expanded(
+                  flex: 2,
+                  child: Text(
+                    crypto.name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: isSmallScreen ? 15 : 16,
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  crypto.symbol.toUpperCase(),
-                  style: TextStyle(
-                    color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    crypto.symbol.toUpperCase(),
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.grey[300] : Colors.grey[700],
+                      fontSize: isSmallScreen ? 11 : 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
             ),
-            subtitle: Text(
-              'Market Cap: \$${_formatNumber(crypto.marketCap)}',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                fontWeight: FontWeight.w500,
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Market Cap: \$${_formatNumber(crypto.marketCap)}',
+                style: TextStyle(
+                  fontSize: isSmallScreen ? 11 : 12,
+                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
               ),
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '\$${formatPrice(crypto.currentPrice)}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.center,
+            trailing: SizedBox(
+              width: isSmallScreen ? 130 : 150,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        Icon(
-                          isPositive
-                              ? Icons.arrow_upward
-                              : Icons.arrow_downward,
-                          color: isPositive ? Colors.green : Colors.red,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        // Price change percentage
                         Text(
-                          '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                          '\$${formatPrice(crypto.currentPrice)}',
                           style: TextStyle(
-                            color: isPositive ? Colors.green : Colors.red,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isSmallScreen ? 15 : 16,
+                            color: isDarkMode ? Colors.white : Colors.black,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                        const SizedBox(height: 2),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (isPositive ? Colors.green : Colors.red)
+                                .withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isPositive
+                                    ? Icons.arrow_upward
+                                    : Icons.arrow_downward,
+                                color: isPositive ? Colors.green : Colors.red,
+                                size: isSmallScreen ? 12 : 14,
+                              ),
+                              const SizedBox(width: 2),
+                              Flexible(
+                                child: Text(
+                                  '${isPositive ? '+' : ''}${crypto.priceChangePercentage24h.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    color:
+                                        isPositive ? Colors.green : Colors.red,
+                                    fontSize: isSmallScreen ? 11 : 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Remove from favorites',
-                  padding: const EdgeInsets.all(0),
-                  constraints: const BoxConstraints(),
-                  iconSize: 24,
-                  color: isDarkMode ? Colors.white : Colors.black,
-                  icon: const Icon(Icons.star, color: Colors.amber),
-                  onPressed: () => _showRemoveFavoriteDialog(crypto),
-                ),
-              ],
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.amber.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: IconButton(
+                      tooltip: 'Remove from favorites',
+                      padding: const EdgeInsets.all(8),
+                      constraints: const BoxConstraints(),
+                      iconSize: isSmallScreen ? 20 : 22,
+                      icon: const Icon(Icons.star_rounded, color: Colors.amber),
+                      onPressed: () => _showRemoveFavoriteDialog(crypto),
+                    ),
+                  ),
+                ],
+              ),
             ),
             onLongPress: () => _showRemoveFavoriteDialog(crypto),
             onTap: () {
-              // Navigate to crypto details page
-              Navigator.push(context, MaterialPageRoute(builder: (context) {
-                return CryptoDetailScreen(
-                  crypto: crypto,
-                );
-              }));
+              Navigator.push(
+                context,
+                PageRouteBuilder(
+                  transitionDuration: const Duration(milliseconds: 300),
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      CryptoDetailScreen(crypto: crypto),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.0, 0.1),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        )),
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
+              );
             },
           ),
         );

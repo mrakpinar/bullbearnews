@@ -1,22 +1,25 @@
+import 'dart:async';
+
+import 'package:bullbearnews/screens/profile/wallet/wallets_screen.dart';
 import 'package:bullbearnews/services/auth_service.dart';
-import 'package:bullbearnews/widgets/profile/favorite_cryptos.dart';
+import 'package:bullbearnews/services/firebase_favorites_service.dart';
+import 'package:bullbearnews/services/firebase_new_saved_service.dart';
+import 'package:bullbearnews/widgets/profile/favorite_cryptos_section.dart';
+import 'package:bullbearnews/widgets/profile/liked_portfolios_section.dart';
 import 'package:bullbearnews/widgets/profile/portfolio_distribution.dart';
 import 'package:bullbearnews/widgets/profile/portfolio_summary.dart';
 import 'package:bullbearnews/widgets/profile/profile_drawer.dart';
 import 'package:bullbearnews/widgets/profile/profile_header.dart';
-import 'package:bullbearnews/widgets/profile/saved_news.dart';
-import 'package:bullbearnews/widgets/profile/shared_portfolios.dart';
+import 'package:bullbearnews/widgets/profile/saved_news_section.dart';
+import 'package:bullbearnews/widgets/profile/shared_portfolios_section.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import '../../providers/theme_provider.dart';
 import '../../models/crypto_model.dart';
 import '../../models/wallet_model.dart';
-import '../../models/news_model.dart';
 import '../../services/crypto_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -45,6 +48,10 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoadingSharedPortfolios = true;
   final ScrollController _scrollController = ScrollController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final FirebaseFavoritesService _favoritesService = FirebaseFavoritesService();
+  StreamSubscription<Set<String>>? _favoritesSubscription;
+  final FirebaseSavedNewsService _savedNewsService = FirebaseSavedNewsService();
+  StreamSubscription<int>? _savedNewsCountSubscription;
 
   // Animation controllers
   late AnimationController _headerAnimationController;
@@ -69,9 +76,31 @@ class _ProfileScreenState extends State<ProfileScreen>
     _setupScrollListener();
     _loadData();
     _loadMySharedPortfolios();
-    _loadFavoriteCryptosCount(); // Favori coin sayısını yükle
-    _loadSavedNewsCount(); // Saved news sayısını yükle
-    _setupHiveListener(); // Hive listener ekle
+    _loadWalletItems();
+    _setupFavoritesListener();
+    _setupSavedNewsListener();
+  }
+
+  void _setupSavedNewsListener() {
+    _savedNewsCountSubscription =
+        _savedNewsService.getSavedNewsCountStream().listen(
+      // ignore: avoid_types_as_parameter_names
+      (count) {
+        if (mounted) {
+          setState(() {
+            _savedNewsCount = count;
+          });
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _savedNewsCount = 0;
+            _errorMessage = 'Failed to load saved news count: $error';
+          });
+        }
+      },
+    );
   }
 
   void _initializeAnimations() {
@@ -123,41 +152,46 @@ class _ProfileScreenState extends State<ProfileScreen>
     });
   }
 
-  // Hive listener'ı kurmak için
-  void _setupHiveListener() {
-    try {
-      final savedNewsBox = Hive.box<NewsModel>('savedNews');
-      savedNewsBox.listenable().addListener(() {
-        _loadSavedNewsCount();
-      });
-    } catch (e) {
-      // Hive box henüz açılmamışsa hata vermez
-      debugPrint('Hive box not ready yet: $e');
-    }
-  }
-
   @override
   void dispose() {
+    _favoritesSubscription?.cancel();
     _scrollController.dispose();
     _headerAnimationController.dispose();
     _hideAnimationController.dispose();
+    _savedNewsCountSubscription?.cancel();
     super.dispose();
   }
 
-  // Favori coin sayısını SharedPreferences'tan yükle
-  Future<void> _loadFavoriteCryptosCount() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final List<String> favoriteIds =
-          prefs.getStringList('favoriteCryptos') ?? [];
+  void _setupFavoritesListener() {
+    _favoritesSubscription = _favoritesService.watchFavoriteCryptos().listen(
+      (favoriteIds) {
+        if (mounted) {
+          setState(() {
+            _favoriteCryptosCount = favoriteIds.length;
+          });
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _favoriteCryptosCount = 0;
+            _errorMessage = 'Failed to load favorites: $error';
+          });
+        }
+      },
+    );
+  }
 
+  // Remove the old _loadFavoriteCryptosCount method and replace with:
+  Future<void> _updateFavoriteCryptosCount() async {
+    try {
+      final favoriteIds = await _favoritesService.getFavoriteCryptos();
       if (mounted) {
         setState(() {
           _favoriteCryptosCount = favoriteIds.length;
         });
       }
     } catch (e) {
-      // Hata durumunda sayıyı 0 olarak bırak
       if (mounted) {
         setState(() {
           _favoriteCryptosCount = 0;
@@ -166,35 +200,9 @@ class _ProfileScreenState extends State<ProfileScreen>
     }
   }
 
-  // Saved news sayısını Hive'dan yükle
-  Future<void> _loadSavedNewsCount() async {
-    try {
-      final savedNewsBox = Hive.box<NewsModel>('savedNews');
-      final count = savedNewsBox.length;
-
-      if (mounted) {
-        setState(() {
-          _savedNewsCount = count;
-        });
-      }
-    } catch (e) {
-      // Hata durumunda sayıyı 0 olarak bırak
-      if (mounted) {
-        setState(() {
-          _savedNewsCount = 0;
-        });
-      }
-    }
-  }
-
-  // Favori coin sayısını güncelleme callback'i
+  // Update the _onFavoriteCryptosChanged callback:
   void _onFavoriteCryptosChanged() {
-    _loadFavoriteCryptosCount();
-  }
-
-  // Saved news sayısını güncelleme callback'i
-  void _onSavedNewsChanged() {
-    _loadSavedNewsCount();
+    _updateFavoriteCryptosCount();
   }
 
   Future<void> _loadMySharedPortfolios() async {
@@ -515,6 +523,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 color: isDarkMode
                                     ? Colors.white
                                     : const Color(0xFF222831),
+                                fontSize: 16,
+                                fontFamily: 'DMSerif',
                               ),
                             ),
                           ),
@@ -544,6 +554,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           color: isDarkMode
                               ? Colors.white.withOpacity(0.7)
                               : Colors.grey[600],
+                          fontSize: 14,
+                          fontFamily: 'DMSerif',
                         ),
                       ),
                     ],
@@ -585,7 +597,9 @@ class _ProfileScreenState extends State<ProfileScreen>
 
           return Container(
             decoration: BoxDecoration(
-              color: isDarkMode ? const Color(0xFF1A1D23) : Colors.white,
+              color: isDarkMode
+                  ? const Color(0xFF222831)
+                  : const Color(0xFFDFD0B8),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(28),
                 topRight: Radius.circular(28),
@@ -595,62 +609,46 @@ class _ProfileScreenState extends State<ProfileScreen>
               children: [
                 // Handle
                 Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 20),
+                  margin: const EdgeInsets.only(top: 12, bottom: 8),
                   width: 50,
                   height: 5,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: isDarkMode
+                        ? Colors.white.withOpacity(0.3)
+                        : Colors.black.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                // Header
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: iconColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          icon,
-                          color: iconColor,
-                          size: 24,
-                        ),
+                // Close button
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 16, bottom: 8),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                            ? Colors.white.withOpacity(0.1)
+                            : Colors.black.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
-                            color: isDarkMode
-                                ? Colors.white
-                                : const Color(0xFF222831),
-                          ),
-                        ),
-                      ),
-                      IconButton(
+                      child: IconButton(
                         onPressed: () => Navigator.pop(context),
                         icon: Icon(
                           Icons.close,
                           color: isDarkMode
                               ? Colors.white.withOpacity(0.7)
-                              : Colors.grey[600],
+                              : Colors.black.withOpacity(0.7),
+                          size: 20,
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 20),
-                // Content
+                // Content - direkt section'ı göster
                 Expanded(
                   child: SingleChildScrollView(
                     controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: content,
                   ),
                 ),
@@ -662,7 +660,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     ).then((_) {
       // Bottom sheet kapandığında sayıları güncelle
       _onFavoriteCryptosChanged();
-      _onSavedNewsChanged();
     });
   }
 
@@ -725,13 +722,22 @@ class _ProfileScreenState extends State<ProfileScreen>
                           const SizedBox(height: 24),
 
                           // Portfolio Summary Card
-                          PortfolioSummary(
-                            onUpdate: () {
-                              _loadWalletItems();
-                              if (mounted) {
-                                setState(() {});
-                              }
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => WalletsScreen()),
+                              );
                             },
+                            child: PortfolioSummary(
+                              onUpdate: () {
+                                _loadWalletItems();
+                                if (mounted) {
+                                  setState(() {});
+                                }
+                              },
+                            ),
                           ),
                           const SizedBox(height: 24),
 
@@ -770,7 +776,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
                           // Saved News Card - Badge ile güncellendi
                           _buildQuickActionCard(
-                            title: "Saved Articles",
+                            title: "Saved News",
                             subtitle: "Your bookmarked news",
                             icon: Icons.bookmark_outline,
                             iconColor: const Color(0xFF2196F3),
@@ -785,7 +791,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                               content: const SavedNewsSection(),
                             ),
                           ),
-
+                          // Liked Portfolios
+                          _buildQuickActionCard(
+                            title: "Liked Portfolios",
+                            subtitle: "Liked portfolio insights",
+                            icon: Icons.library_add_rounded,
+                            iconColor: const Color(0xFFFEA405),
+                            badgeText: _mySharedPortfolios.isNotEmpty
+                                ? _mySharedPortfolios.length.toString()
+                                : null,
+                            badgeColor: const Color(0xFFFEA405),
+                            onTap: () => _showContentBottomSheet(
+                              title: "Shared Portfolios",
+                              icon: Icons.library_add_outlined,
+                              iconColor: const Color(0xFF6420AA),
+                              content: const LikedPortfoliosSection(),
+                            ),
+                          ),
                           // Shared Portfolios Card
                           _buildQuickActionCard(
                             title: "Shared Portfolios",
@@ -804,7 +826,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
 
-                          const SizedBox(height: 100),
+                          const SizedBox(height: 10),
                         ],
                       ),
               ),

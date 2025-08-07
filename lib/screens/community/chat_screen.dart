@@ -1,6 +1,9 @@
-import 'dart:ui';
-
-import 'package:bullbearnews/screens/profile/shown_profile_screen.dart';
+import 'package:bullbearnews/widgets/community/chat/banned_prompt.dart';
+import 'package:bullbearnews/widgets/community/chat/empty_message_states.dart';
+import 'package:bullbearnews/widgets/community/chat/join_prompt.dart';
+import 'package:bullbearnews/widgets/community/chat/message_card.dart';
+import 'package:bullbearnews/widgets/community/chat/message_input.dart';
+import 'package:bullbearnews/widgets/community/chat/reply_preview.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
@@ -21,15 +24,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   final ChatService _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
   bool _hasJoinedRoom = false;
+  bool _isUserBanned = false;
   bool _isDescriptionExpanded = false;
   late AnimationController _animationController;
   late Animation<double> _expandAnimation;
   late final Stream<List<ChatMessage>> _messagesStream;
 
+  // Reply functionality
+  ChatMessage? _replyToMessage;
+  final FocusNode _textFieldFocus = FocusNode();
+
   @override
   void initState() {
     super.initState();
     _checkIfUserJoinedRoom();
+    _checkIfUserBanned();
     _initializeAnimations();
     // Stream'i cache'le
     _messagesStream = _chatService.getChatMessages(widget.chatRoom.id);
@@ -51,6 +60,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     _messageController.dispose();
     _scrollController.dispose();
     _animationController.dispose();
+    _textFieldFocus.dispose();
     super.dispose();
   }
 
@@ -76,6 +86,22 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  Future<void> _checkIfUserBanned() async {
+    final currentUser = _chatService.getCurrentUser();
+    if (currentUser == null) return;
+
+    try {
+      final isBanned = await _chatService.isUserBannedFromRoom(
+          currentUser.uid, widget.chatRoom.id);
+
+      if (mounted) {
+        setState(() => _isUserBanned = isBanned);
+      }
+    } catch (e) {
+      debugPrint('Error checking if user is banned: $e');
+    }
+  }
+
   void _toggleDescription() {
     setState(() {
       _isDescriptionExpanded = !_isDescriptionExpanded;
@@ -87,12 +113,25 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     }
   }
 
+  // Cancel reply
+  void _cancelReply() {
+    setState(() {
+      _replyToMessage = null;
+    });
+  }
+
   void _sendMessage() {
     final text = _messageController.text.trim();
-    if (text.isEmpty || !_hasJoinedRoom) return;
+    if (text.isEmpty || !_hasJoinedRoom || _isUserBanned) return;
 
-    _chatService.sendMessage(widget.chatRoom.id, text);
+    _chatService.sendMessage(
+      widget.chatRoom.id,
+      text,
+      replyToMessage: _replyToMessage,
+    );
+
     _messageController.clear();
+    _cancelReply(); // Reply'i temizle
 
     // Auto scroll to bottom
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -107,6 +146,17 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _joinRoom() async {
+    // Ban kontrolü
+    if (_isUserBanned) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bu odaya katılamazsınız, yasaklısınız.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     try {
       await _chatService.joinRoom(widget.chatRoom.id);
       if (mounted) {
@@ -126,6 +176,172 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
     Navigator.of(context).pop();
   }
 
+  // Raporlama dialog'u
+  Future<void> _showReportDialog(ChatMessage message) async {
+    final currentUser = _chatService.getCurrentUser();
+    if (currentUser == null) return;
+
+    // Kendi mesajını raporlayamaz
+    if (message.userId == currentUser.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You cannot report your own message.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    String? selectedReason;
+    final reasons = [
+      'Spam',
+      'Insult/Profanity',
+      'Inappropriate Content',
+      'Fraud',
+      'Hate Speech',
+      'Other',
+    ];
+
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: Text(
+                'Report Message',
+                style: TextStyle(
+                  fontFamily: 'DMSerif',
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.onSurface,
+                ),
+              ),
+              backgroundColor: Theme.of(context).cardTheme.color,
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'User: ${message.username}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200]?.withOpacity(0.4),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      message.content,
+                      style: TextStyle(
+                        fontStyle: FontStyle.italic,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Reason for reporting:',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                      decorationStyle: TextDecorationStyle.solid,
+                      decorationColor: Theme.of(context).colorScheme.secondary,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...reasons.map((reason) => RadioListTile<String>(
+                        title: Text(
+                          reason,
+                          style: TextStyle(
+                            fontFamily: 'DMSerif',
+                            color: Theme.of(context).colorScheme.secondary,
+                          ),
+                        ),
+                        value: reason,
+                        groupValue: selectedReason,
+                        fillColor: MaterialStateProperty.all(
+                          Theme.of(context).colorScheme.secondary,
+                        ),
+                        onChanged: (value) {
+                          setState(() {
+                            selectedReason = value;
+                          });
+                        },
+                        dense: true,
+                      )),
+                ],
+              ),
+              actions: [
+                ElevatedButton(
+                  style: ButtonStyle(
+                      backgroundColor: WidgetStateProperty.all(
+                          Colors.grey[400]?.withOpacity(0.4))),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: selectedReason != null
+                      ? () async {
+                          try {
+                            await _chatService.reportMessage(
+                              roomId: widget.chatRoom.id,
+                              messageId: message.id,
+                              messageContent: message.content,
+                              messageUserId: message.userId,
+                              messageUserName: message.username,
+                              reason: selectedReason!,
+                            );
+
+                            if (mounted) {
+                              Navigator.of(context).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content:
+                                      Text('Message reported successfully.'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Error: $e'),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                            }
+                          }
+                        }
+                      : null,
+                  child: Text(
+                    'Report',
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -137,11 +353,20 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         children: [
           _buildCollapsibleDescription(theme),
           Expanded(child: _buildMessagesStream(theme, colorScheme)),
-          if (!_hasJoinedRoom)
-            _JoinPrompt(onJoin: _joinRoom, theme: theme)
+          if (_replyToMessage != null)
+            ReplyPreview(
+              message: _replyToMessage!,
+              onCancel: _cancelReply,
+              theme: theme,
+            ),
+          if (_isUserBanned)
+            BannedPrompt(theme: theme)
+          else if (!_hasJoinedRoom)
+            JoinPrompt(onJoin: _joinRoom, theme: theme)
           else
-            _MessageInput(
+            MessageInput(
               controller: _messageController,
+              focusNode: _textFieldFocus,
               onSend: _sendMessage,
               theme: theme,
               colorScheme: colorScheme,
@@ -172,7 +397,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             const SizedBox(
               width: 8,
             ),
-            if (_isDescriptionExpanded)
+            if (_isUserBanned)
+              Icon(
+                Icons.block,
+                color: Colors.red,
+                size: 24,
+              )
+            else if (_isDescriptionExpanded)
               const Icon(Icons.keyboard_arrow_up_rounded, size: 28)
             else
               const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
@@ -194,12 +425,13 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
       ),
       elevation: 0,
       actions: [
-        IconButton(
-          onPressed: _leaveRoom,
-          icon: Icon(
-            Icons.exit_to_app_sharp,
-          ),
-        )
+        if (!_isUserBanned) // Banned kullanıcılar odadan çıkamaz
+          IconButton(
+            onPressed: _leaveRoom,
+            icon: Icon(
+              Icons.exit_to_app_sharp,
+            ),
+          )
       ],
     );
   }
@@ -229,6 +461,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
             child: _DescriptionCard(
               chatRoom: widget.chatRoom,
               theme: theme,
+              isUserBanned: _isUserBanned,
             ),
           ),
         ),
@@ -247,7 +480,7 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
         }
 
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return _EmptyMessagesState(theme: theme, colorScheme: colorScheme);
+          return EmptyMessagesState(theme: theme, colorScheme: colorScheme);
         }
 
         return ListView.builder(
@@ -259,13 +492,21 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
           addRepaintBoundaries: true,
           itemBuilder: (context, index) {
             final message = snapshot.data![index];
-            return _MessageCard(
+            return MessageCard(
               key: ValueKey(message.id),
               message: message,
               isCurrentUser: _chatService.isCurrentUser(message.userId),
-              hasJoinedRoom: _hasJoinedRoom,
+              hasJoinedRoom: _hasJoinedRoom && !_isUserBanned,
               theme: theme,
               colorScheme: colorScheme,
+              onReport: () => _showReportDialog(message),
+              onReply: (ChatMessage replyMessage) {
+                // Düzeltildi
+                setState(() {
+                  _replyToMessage = replyMessage; // State'i güncelle
+                });
+                _textFieldFocus.requestFocus(); // Text field'e focus ver
+              },
             );
           },
         );
@@ -278,10 +519,12 @@ class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
 class _DescriptionCard extends StatelessWidget {
   final ChatRoom chatRoom;
   final ThemeData theme;
+  final bool isUserBanned;
 
   const _DescriptionCard({
     required this.chatRoom,
     required this.theme,
+    required this.isUserBanned,
   });
 
   @override
@@ -294,14 +537,45 @@ class _DescriptionCard extends StatelessWidget {
             : Colors.grey[50],
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: theme.brightness == Brightness.dark
-              ? Colors.grey[700]!
-              : Colors.grey[200]!,
+          color: isUserBanned
+              ? Colors.red.withOpacity(0.5)
+              : theme.brightness == Brightness.dark
+                  ? Colors.grey[700]!
+                  : Colors.grey[200]!,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isUserBanned)
+            Container(
+              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.red.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.block,
+                    color: Colors.red,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Bu odadan yasaklandınız. Mesaj gönderemez ve odaya katılamazsınız.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.red[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           Text(
             chatRoom.description,
             style: theme.textTheme.bodyMedium?.copyWith(
@@ -330,403 +604,6 @@ class _DescriptionCard extends StatelessWidget {
                   ? Colors.grey[400]
                   : Colors.grey[500],
               fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyMessagesState extends StatelessWidget {
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _EmptyMessagesState({
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.chat_bubble_outline,
-            size: 64,
-            color: colorScheme.primary.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No messages yet.',
-            style: theme.textTheme.titleMedium,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Be the first to start the conversation!',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[400]
-                  : Colors.grey[600],
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageCard extends StatelessWidget {
-  final ChatMessage message;
-  final bool isCurrentUser;
-  final bool hasJoinedRoom;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _MessageCard({
-    super.key,
-    required this.message,
-    required this.isCurrentUser,
-    required this.hasJoinedRoom,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: Opacity(
-        opacity: hasJoinedRoom ? 1.0 : 1,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: hasJoinedRoom ? 0 : 10,
-            sigmaY: hasJoinedRoom ? 0 : 8,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: isCurrentUser
-                  ? MainAxisAlignment.end
-                  : MainAxisAlignment.start,
-              children: [
-                if (!isCurrentUser) _buildAvatar(context),
-                _buildMessageBubble(context),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAvatar(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ShownProfileScreen(userId: message.userId),
-          ),
-        );
-      },
-      child: Padding(
-        padding: const EdgeInsets.only(right: 8),
-        child: CircleAvatar(
-          radius: 16,
-          backgroundColor: colorScheme.primary.withOpacity(0.2),
-          backgroundImage: message.userProfileImage != null
-              ? NetworkImage(
-                  message.userProfileImage!,
-                  scale: 1.5,
-                )
-              : null,
-          child: message.userProfileImage == null
-              ? Text(
-                  message.username.isNotEmpty
-                      ? message.username[0].toUpperCase()
-                      : '?',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                )
-              : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageBubble(BuildContext context) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.75,
-      ),
-      child: Column(
-        crossAxisAlignment:
-            isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (!isCurrentUser)
-            GestureDetector(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        ShownProfileScreen(userId: message.userId),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  message.username,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.grey[200]
-                        : Colors.grey[800],
-                    fontSize: 16,
-                    height: 1.2,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ),
-            ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: isCurrentUser
-                  ? colorScheme.primary
-                  : theme.brightness == Brightness.dark
-                      ? Colors.grey[800]
-                      : Colors.grey[200],
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(12),
-                topRight: const Radius.circular(12),
-                bottomLeft: isCurrentUser
-                    ? const Radius.circular(12)
-                    : const Radius.circular(4),
-                bottomRight: isCurrentUser
-                    ? const Radius.circular(4)
-                    : const Radius.circular(12),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.content,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: isCurrentUser
-                        ? Colors.white
-                        : theme.brightness == Brightness.dark
-                            ? Colors.grey[200]
-                            : Colors.grey[800],
-                    fontSize: 16,
-                    height: 1.4,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                _buildMessageFooter(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageFooter() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          message.timestamp.toString().substring(11, 16),
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: isCurrentUser
-                ? Colors.white.withOpacity(0.7)
-                : theme.brightness == Brightness.dark
-                    ? Colors.grey[400]
-                    : Colors.grey[600],
-            fontSize: 10,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        if (message.likes > 0) ...[
-          const SizedBox(width: 8),
-          Icon(
-            Icons.thumb_up_alt_outlined,
-            size: 14,
-            color: isCurrentUser
-                ? Colors.white.withOpacity(0.7)
-                : theme.brightness == Brightness.dark
-                    ? Colors.grey[400]
-                    : Colors.grey[600],
-          ),
-          const SizedBox(width: 2),
-          Text(
-            '${message.likes}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isCurrentUser
-                  ? Colors.white.withOpacity(0.7)
-                  : theme.brightness == Brightness.dark
-                      ? Colors.grey[400]
-                      : Colors.grey[600],
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _JoinPrompt extends StatelessWidget {
-  final VoidCallback onJoin;
-  final ThemeData theme;
-
-  const _JoinPrompt({
-    required this.onJoin,
-    required this.theme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 26.0),
-      color: theme.brightness == Brightness.dark
-          ? Colors.grey[850]
-          : Colors.grey[200],
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.lock_outline,
-            size: 32,
-            color: theme.brightness == Brightness.dark
-                ? Colors.grey[400]
-                : Colors.grey[600],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              'You must join the room to send messages.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[400]
-                    : Colors.grey[600],
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 16),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-              backgroundColor: theme.brightness == Brightness.dark
-                  ? Colors.grey[800]
-                  : Colors.grey[600],
-              foregroundColor: Colors.grey[200],
-              minimumSize: const Size(120, 40),
-            ),
-            onPressed: onJoin,
-            child: const Text(
-              'Join Room',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MessageInput extends StatelessWidget {
-  final TextEditingController controller;
-  final VoidCallback onSend;
-  final ThemeData theme;
-  final ColorScheme colorScheme;
-
-  const _MessageInput({
-    required this.controller,
-    required this.onSend,
-    required this.theme,
-    required this.colorScheme,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
-        border: Border(
-          top: BorderSide(
-            color: isDark ? Colors.black26 : Colors.white30,
-          ),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark ? Colors.black26 : Colors.white70,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: TextField(
-                controller: controller,
-                style: TextStyle(
-                  fontFamily: 'DMSerif',
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-                decoration: InputDecoration(
-                  hintText: 'Type a message...',
-                  hintStyle: TextStyle(
-                    fontFamily: 'DMSerif',
-                    color: isDark ? Colors.white54 : Colors.black54,
-                  ),
-                  border: InputBorder.none,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20),
-                ),
-                onSubmitted: (_) => onSend(),
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  const Color(0xFF393E46),
-                  const Color(0xFF948979),
-                ],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: onSend,
-              icon: const Icon(Icons.send, color: Colors.white),
             ),
           ),
         ],

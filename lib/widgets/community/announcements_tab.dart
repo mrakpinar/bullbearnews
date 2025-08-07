@@ -34,8 +34,10 @@ class AnnouncementsTab extends StatelessWidget {
           return ListView.separated(
             itemCount: announcements.length,
             separatorBuilder: (_, __) => const SizedBox(height: 16),
-            itemBuilder: (context, index) =>
-                AnnouncementCard(announcement: announcements[index]),
+            itemBuilder: (context, index) => AnnouncementCard(
+              announcement: announcements[index],
+              isLatest: index == 0, // İlk sıradaki (en yeni) duyuru
+            ),
           );
         },
       ),

@@ -1,8 +1,9 @@
 import 'package:bullbearnews/screens/home/new_details_screen.dart';
+import 'package:bullbearnews/services/firebase_new_saved_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/news_model.dart';
-import '../services/local_storage_service.dart';
 
 class NewsCard extends StatefulWidget {
   final NewsModel news;
@@ -308,10 +309,10 @@ class _NewsCardState extends State<NewsCard>
   }
 
   Widget _buildSaveButton() {
-    return FutureBuilder<bool>(
-      future: LocalStorageService.isNewsSaved(widget.news.id),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseSavedNewsService().getNewsDocumentStream(widget.news.id),
       builder: (context, snapshot) {
-        final isSaved = snapshot.data ?? false;
+        final isSaved = snapshot.hasData && snapshot.data!.exists;
         return Container(
           decoration: BoxDecoration(
             color: const Color(0xFF393E46).withOpacity(0.9),
@@ -345,14 +346,17 @@ class _NewsCardState extends State<NewsCard>
 
   Future<void> _toggleSave() async {
     try {
-      final isSaved = await LocalStorageService.isNewsSaved(widget.news.id);
+      final firebaseService = FirebaseSavedNewsService();
+      final isSaved = await firebaseService.isNewsSaved(widget.news.id);
+
       if (isSaved) {
-        await LocalStorageService.removeNews(widget.news.id);
+        await firebaseService.removeSavedNews(widget.news.id);
         _showSnackBar('Removed from saved', Colors.red);
       } else {
-        await LocalStorageService.saveNews(widget.news);
+        await firebaseService.saveNews(widget.news);
         _showSnackBar('Added to saved', Colors.green);
       }
+
       if (mounted) setState(() {});
     } catch (e) {
       _showSnackBar('Error: ${e.toString()}', Colors.red);

@@ -1,0 +1,17 @@
+flutter_native_splash:
+  android: true
+  ios: true
+  web: false
+
+  color: "#222831" # Background image yüklenemezse fallback olarak
+
+  background_image: assets/image/background.png
+  image: assets/image/BBN_logo2.png
+  # branding: assets/image/branding.png
+
+  android_gravity: center
+
+  # Android 12+ için ayrı ayarlar
+  android_12:
+    image: assets/image/BBN_logo2.png
+    # branding: assets/image/branding.png

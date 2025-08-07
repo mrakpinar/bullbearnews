@@ -1,9 +1,13 @@
+import 'package:bullbearnews/constants/colors.dart';
+import 'package:bullbearnews/screens/analytics/analytics_screen.dart';
 import 'package:bullbearnews/screens/videos/videos_screen.dart';
 import 'package:flutter/material.dart';
 import 'home/home_screen.dart';
 import 'market/market_screen.dart';
 import 'community/community_screen.dart';
 import 'profile/profile_screen.dart';
+import '../services/announcement_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -14,9 +18,13 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedIndex = 4;
+  int _selectedIndex = 0;
   late final PageController _pageController;
   late AnimationController _animationController;
+
+  final AnnouncementService _announcementService = AnnouncementService();
+  bool _hasNewAnnouncements = false;
+  String? _lastSeenAnnouncementId;
 
   @override
   void initState() {
@@ -26,13 +34,39 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
+    _loadLastSeenAnnouncement();
+    _listenToAnnouncements();
   }
 
-  final List<Widget> _screens = const [
-    MarketScreen(),
-    VideosScreen(),
+  void _loadLastSeenAnnouncement() async {
+    final prefs = await SharedPreferences.getInstance();
+    _lastSeenAnnouncementId = prefs.getString('last_seen_announcement_id');
+  }
+
+  void _listenToAnnouncements() {
+    _announcementService.getActiveAnnouncements().listen((announcements) {
+      if (announcements.isNotEmpty) {
+        final latestAnnouncement = announcements.first;
+
+        // Eğer son görülen duyuru ID'si yoksa veya yeni bir duyuru varsa
+        if (_lastSeenAnnouncementId == null ||
+            _lastSeenAnnouncementId != latestAnnouncement.id) {
+          if (mounted) {
+            setState(() {
+              _hasNewAnnouncements = true;
+            });
+          }
+        }
+      }
+    });
+  }
+
+  final List<Widget> _screens = [
     HomeScreen(),
     CommunityScreen(),
+    MarketScreen(),
+    VideosScreen(),
+    AnalyticsScreen(),
     ProfileScreen(),
   ];
 
@@ -50,6 +84,33 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     _pageController.jumpToPage(index);
     _animationController.reset();
     _animationController.forward();
+
+    // Community screen'e geçildiğinde badge'i güncelle
+    if (index == 1 && _hasNewAnnouncements) {
+      // Kısa bir gecikme ile badge'i temizle (kullanıcı community'ye girdi)
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        _checkAndClearBadge();
+      });
+    }
+  }
+
+  void _checkAndClearBadge() async {
+    // Aktif duyuruları kontrol et ve badge'i temizle
+    final announcements =
+        await _announcementService.getActiveAnnouncements().first;
+    if (announcements.isNotEmpty) {
+      final latestAnnouncement = announcements.first;
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('last_seen_announcement_id', latestAnnouncement.id);
+
+      if (mounted) {
+        setState(() {
+          _hasNewAnnouncements = false;
+          _lastSeenAnnouncementId = latestAnnouncement.id;
+        });
+      }
+    }
   }
 
   void _onPageChanged(int index) {
@@ -59,6 +120,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: PageView(
         controller: _pageController,
         onPageChanged: _onPageChanged,
@@ -74,115 +136,117 @@ class _MainNavigationScreenState extends State<MainNavigationScreen>
     final theme = Theme.of(context);
     final isDarkMode = theme.brightness == Brightness.dark;
 
-    final primaryColor = theme.colorScheme.secondary;
-    final backgroundColor = isDarkMode
-        ? Colors.grey[900]!.withOpacity(1)
-        : Colors.white.withOpacity(0.95);
-
     return Container(
-      margin: const EdgeInsets.all(16),
+      height: 100,
       decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(30),
+        color: isDarkMode
+            ? const Color.fromARGB(255, 23, 25, 28)
+            : AppColors.lightCard,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(12),
+          topRight: Radius.circular(12),
+        ),
         boxShadow: [
           BoxShadow(
             color: isDarkMode
                 ? Colors.black.withOpacity(0.3)
-                : Colors.grey.withOpacity(0.3),
+                : Colors.grey.withOpacity(0.2),
             blurRadius: 10,
-            offset: const Offset(0, 5),
+            offset: const Offset(0, -2),
           ),
         ],
       ),
-      height: 75,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildNavItem(0, Icons.show_chart_outlined, Icons.show_chart,
-              'Market', primaryColor, isDarkMode),
-          _buildNavItem(1, Icons.video_library_outlined, Icons.video_library,
-              'Videos', primaryColor, isDarkMode),
-          _buildNavItem(2, Icons.home_outlined, Icons.home, 'News',
-              primaryColor, isDarkMode),
-          _buildNavItem(3, Icons.group_outlined, Icons.group, 'Community',
-              primaryColor, isDarkMode),
-          _buildNavItem(4, Icons.person_outline, Icons.person, 'Profile',
-              primaryColor, isDarkMode),
-        ],
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(
+                  0, Icons.home_outlined, Icons.home, 'News', isDarkMode),
+              _buildNavItem(1, Icons.people_outline, Icons.people, 'Community',
+                  isDarkMode,
+                  hasNotification: _hasNewAnnouncements),
+              _buildNavItem(2, Icons.trending_up_outlined, Icons.trending_up,
+                  'Market', isDarkMode),
+              _buildNavItem(3, Icons.play_circle_outline,
+                  Icons.play_circle_filled, 'Videos', isDarkMode),
+              _buildNavItem(4, Icons.analytics_outlined, Icons.analytics,
+                  'Analytics', isDarkMode),
+              _buildNavItem(
+                  5, Icons.person_outline, Icons.person, 'Profile', isDarkMode),
+            ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildNavItem(int index, IconData iconOutlined, IconData iconFilled,
-      String title, Color primaryColor, bool isDarkMode) {
+      String title, bool isDarkMode,
+      {bool hasNotification = false}) {
     final isSelected = _selectedIndex == index;
 
     return Expanded(
-      child: InkWell(
+      child: GestureDetector(
         onTap: () => _onItemTapped(index),
-        borderRadius: BorderRadius.circular(30),
-        splashColor: primaryColor.withOpacity(0.2),
-        highlightColor: primaryColor.withOpacity(0.1),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          decoration: BoxDecoration(
-            color:
-                isSelected ? primaryColor.withOpacity(0.2) : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+          duration: const Duration(milliseconds: 200),
+          height: 75,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                height: isSelected ? 4 : 0,
-                width: isSelected ? 30 : 0,
-                margin: const EdgeInsets.only(bottom: 4),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? (isDarkMode ? Colors.white : primaryColor)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              Icon(
-                isSelected ? iconFilled : iconOutlined,
-                size: isSelected ? 30 : 24,
-                color: isSelected
-                    ? isDarkMode
-                        ? Colors.white
-                        : Theme.of(context).colorScheme.primary
-                    : isDarkMode
-                        ? primaryColor
-                        : Colors.grey[600],
-              ),
-              if (isSelected)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    maxLines: 1,
-                    style: TextStyle(
-                      color: Theme.of(context).brightness == Brightness.light
-                          ? primaryColor
-                          : Colors.white,
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      fontWeight: FontWeight.w600,
-                      shadows: [
-                        Shadow(
-                          color: isDarkMode
-                              ? Colors.black.withOpacity(0.5)
-                              : Colors.grey.withOpacity(0.5),
-                          offset: const Offset(1, 1),
-                          blurRadius: 2,
-                        ),
-                      ],
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                        color: isSelected
+                            ? AppColors.secondary.withOpacity(0.4)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(50)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Icon(
+                        isSelected ? iconFilled : iconOutlined,
+                        size: isSelected ? 26 : 22,
+                        color: isSelected
+                            ? AppColors.whiteText
+                            : isDarkMode
+                                ? AppColors.secondary.withOpacity(0.5)
+                                : AppColors.primary.withOpacity(0.6),
+                      ),
                     ),
                   ),
-                ),
+                  // Bildirim badge'i
+                  if (hasNotification && !isSelected)
+                    Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: isDarkMode
+                                ? const Color.fromARGB(255, 23, 25, 28)
+                                : AppColors.lightCard,
+                            width: 2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.4),
+                              blurRadius: 4,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

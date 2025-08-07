@@ -1,4 +1,7 @@
+import 'package:bullbearnews/screens/home/chat_screen.dart';
+import 'package:bullbearnews/screens/home/notification_screen.dart';
 import 'package:bullbearnews/screens/home/search_user_screen.dart';
+import 'package:bullbearnews/services/notification_service.dart';
 import 'package:bullbearnews/widgets/news_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -14,14 +17,24 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final NewsService _newsService = NewsService();
+  final NotificationService _notificationService = NotificationService();
   List<NewsModel> _allNews = [];
-  final List<String> _categories = [
-    'All',
-    'Trending',
-    'New',
-    'Teknoloji',
-    'Sağlık'
+
+  // Backend'deki crypto kategorilerine göre güncellendi
+  final List<Map<String, String>> _categories = [
+    {'name': 'All', 'icon': '📰'},
+    {'name': 'Breaking', 'icon': '🚨'},
+    {'name': 'Bitcoin', 'icon': '₿'},
+    {'name': 'Ethereum', 'icon': 'Ξ'},
+    {'name': 'Altcoins', 'icon': '🪙'},
+    {'name': 'DeFi', 'icon': '🏦'},
+    {'name': 'NFT', 'icon': '🎨'},
+    {'name': 'Blockchain', 'icon': '⛓️'},
+    {'name': 'Trading', 'icon': '📈'},
+    {'name': 'Technology', 'icon': '💻'},
+    {'name': 'Regulation', 'icon': '⚖️'},
   ];
+
   String _selectedCategory = 'All';
   bool _isLoading = true;
   final ScrollController _scrollController = ScrollController();
@@ -115,6 +128,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  // Normal yükleme - cache'li
   Future<void> _loadNews() async {
     if (_newsCache.containsKey(_selectedCategory)) {
       setState(() {
@@ -154,6 +168,52 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  // Pull to refresh - cache'i temizleyerek fresh data çek
+  Future<void> _refreshNews() async {
+    try {
+      List<NewsModel> news;
+      if (_selectedCategory == 'All') {
+        news = await _newsService.getNews();
+      } else {
+        news = await _newsService.getNewsByCategory(_selectedCategory);
+      }
+
+      // Cache'i güncelle
+      _newsCache[_selectedCategory] = news;
+
+      if (mounted) {
+        setState(() {
+          _allNews = news;
+        });
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Haber yenileme hatası: $e');
+      }
+
+      // Hata mesajı
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.error, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Failed to refresh news: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -178,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         children: [
                           _buildHeader(isDark),
                           _buildCategoryFilter(isDark),
+                          // NotificationDebugWidget()
                         ],
                       ),
                     ),
@@ -239,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                             Text(
                               'BullBearNews',
                               style: TextStyle(
-                                fontSize: 24,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w800,
                                 color: isDark
                                     ? const Color(0xFFDFD0B8)
@@ -252,7 +313,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Stay informed, stay ahead',
+                          'Your crypto news destination 🚀',
                           style: TextStyle(
                             fontSize: 14,
                             color: isDark
@@ -279,17 +340,135 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         isDark: isDark,
                       ),
                       const SizedBox(width: 8),
-                      // _buildActionButton(
-                      //   icon: Icons.tune_rounded,
-                      //   onTap: _showFilterDialog,
-                      //   isDark: isDark,
-                      // ),
+                      _buildNotificationButton(isDark),
+                      const SizedBox(width: 8),
+                      _buildMessageButton(
+                        icon: Icons.message_outlined,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => ChatScreen()),
+                        ),
+                        isDark: isDark,
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMessageButton(
+      {required IconData icon,
+      required VoidCallback onTap,
+      required bool isDark}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF393E46).withOpacity(0.8)
+            : Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Icon(
+              icon,
+              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF393E46),
+              size: 20,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNotificationButton(bool isDark) {
+    return StreamBuilder<int>(
+      stream: _notificationService.getUnreadNotificationCount(),
+      builder: (context, snapshot) {
+        final unreadCount = snapshot.data ?? 0;
+
+        return Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF393E46).withOpacity(0.8)
+                    : Colors.white.withOpacity(0.9),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const NotificationsScreen(),
+                    ),
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.notifications_outlined,
+                      color: isDark
+                          ? const Color(0xFFDFD0B8)
+                          : const Color(0xFF393E46),
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 10,
+                    minHeight: 10,
+                  ),
+                  child: Text(
+                    unreadCount > 99 ? '99+' : unreadCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      fontFamily: 'Roboto',
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -341,7 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           child: Opacity(
             opacity: _categoryAnimation.value,
             child: Container(
-              height: 50,
+              height: 48,
               margin: const EdgeInsets.only(bottom: 16),
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
@@ -349,7 +528,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 itemCount: _categories.length,
                 itemBuilder: (context, index) {
                   final category = _categories[index];
-                  final isSelected = category == _selectedCategory;
+                  final categoryName = category['name']!;
+                  final categoryIcon = category['icon']!;
+                  final isSelected = categoryName == _selectedCategory;
 
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 300),
@@ -358,13 +539,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       color: Colors.transparent,
                       child: InkWell(
                         onTap: () {
-                          setState(() => _selectedCategory = category);
+                          setState(() => _selectedCategory = categoryName);
                           _loadNews();
                         },
-                        borderRadius: BorderRadius.circular(25),
+                        borderRadius: BorderRadius.circular(28),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 20, vertical: 12),
+                              horizontal: 18, vertical: 12),
                           decoration: BoxDecoration(
                             gradient: isSelected
                                 ? LinearGradient(
@@ -379,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                                     ? const Color(0xFF393E46).withOpacity(0.3)
                                     : Colors.white.withOpacity(0.7))
                                 : null,
-                            borderRadius: BorderRadius.circular(25),
+                            borderRadius: BorderRadius.circular(28),
                             border: Border.all(
                               color: isSelected
                                   ? Colors.transparent
@@ -390,20 +571,32 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                               width: 1,
                             ),
                           ),
-                          child: Text(
-                            category,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? const Color(0xFFDFD0B8)
-                                  : (isDark
-                                      ? const Color(0xFF948979)
-                                      : const Color(0xFF393E46)),
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              fontSize: 14,
-                              fontFamily: 'DMSerif',
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                categoryIcon,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                categoryName,
+                                style: TextStyle(
+                                  color: isSelected
+                                      ? const Color(0xFFDFD0B8)
+                                      : (isDark
+                                          ? const Color(0xFF948979)
+                                          : const Color(0xFF393E46)),
+                                  fontWeight: isSelected
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  fontSize: 14,
+                                  fontFamily: 'DMSerif',
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -424,19 +617,132 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(
-                isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF393E46).withOpacity(0.1),
+                    const Color(0xFF948979).withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(
+                  isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                ),
+                strokeWidth: 3,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
-              'Loading news...',
+              'Loading crypto news...',
               style: TextStyle(
                 color:
                     isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
                 fontSize: 16,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'DMSerif',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '📈 Stay ahead of the market',
+              style: TextStyle(
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontSize: 14,
+                fontFamily: 'DMSerif',
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_allNews.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF393E46).withOpacity(0.1),
+                    const Color(0xFF948979).withOpacity(0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                Icons.article_outlined,
+                size: 64,
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No ${_selectedCategory == 'All' ? 'crypto' : _selectedCategory} news',
+              style: TextStyle(
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'DMSerif',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '📱 Pull down to refresh for latest updates',
+              style: TextStyle(
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontSize: 14,
+                fontFamily: 'DMSerif',
+              ),
+            ),
+            const SizedBox(height: 16),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: _refreshNews,
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF393E46),
+                        const Color(0xFF948979),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.refresh_rounded,
+                        color: const Color(0xFFDFD0B8),
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Refresh Now',
+                        style: TextStyle(
+                          color: const Color(0xFFDFD0B8),
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'DMSerif',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
           ],
@@ -445,10 +751,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadNews,
+      onRefresh: _refreshNews, // Değişti: _refreshNews kullanıyor
       color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
       backgroundColor:
           isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
+      strokeWidth: 3,
+      displacement: 40,
       child: ListView.builder(
         controller: _scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),

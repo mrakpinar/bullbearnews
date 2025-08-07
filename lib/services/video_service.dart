@@ -16,11 +16,9 @@ class VideoService {
           _cachedVideos != null &&
           _lastFetchTime != null &&
           DateTime.now().difference(_lastFetchTime!) < _cacheExpiration) {
-        print('Cache\'den videolar getiriliyor');
         return _cachedVideos!;
       }
 
-      print('Firestore\'dan videolar getiriliyor');
       QuerySnapshot snapshot = await _firestore
           .collection('videos')
           .orderBy('publishDate', descending: true)
@@ -42,17 +40,10 @@ class VideoService {
         categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
       }
 
-      print('Toplam video sayısı: ${videos.length}');
-      print('Kategori dağılımı: $categoryCounts');
-
       return videos;
-    } catch (e, stackTrace) {
-      print('Video getirme hatası: $e');
-      print('Stack trace: $stackTrace');
-
+    } catch (e) {
       // Cache varsa onu döndür
       if (_cachedVideos != null) {
-        print('Hata nedeniyle cache\'deki veriler döndürülüyor');
         return _cachedVideos!;
       }
 
@@ -78,9 +69,7 @@ class VideoService {
       print('$category kategorisinde ${filteredVideos.length} video bulundu');
 
       return filteredVideos;
-    } catch (e, stackTrace) {
-      print('Kategoriye göre video getirme hatası: $e');
-      print('Stack trace: $stackTrace');
+    } catch (e) {
       return [];
     }
   }
@@ -89,7 +78,6 @@ class VideoService {
   static void clearCache() {
     _cachedVideos = null;
     _lastFetchTime = null;
-    print('Video cache temizlendi');
   }
 
   // Belirli bir kategorideki video sayısını al
@@ -103,7 +91,6 @@ class VideoService {
       List<VideoModel> categoryVideos = await getVideosByCategory(category);
       return categoryVideos.length;
     } catch (e) {
-      print('Kategori video sayısı getirme hatası: $e');
       return 0;
     }
   }
@@ -119,7 +106,6 @@ class VideoService {
 
       return categories.toList()..sort();
     } catch (e) {
-      print('Kategorileri getirme hatası: $e');
       return [];
     }
   }

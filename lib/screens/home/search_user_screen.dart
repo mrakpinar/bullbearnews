@@ -261,12 +261,12 @@ class _SearchUserScreenState extends State<SearchUserScreen>
                   controller: _searchController,
                   textInputAction: TextInputAction.search,
                   style: TextStyle(
-                    fontSize: 16,
-                    color: isDark
-                        ? const Color(0xFFDFD0B8)
-                        : const Color(0xFF222831),
-                    fontWeight: FontWeight.w500,
-                  ),
+                      fontSize: 16,
+                      color: isDark
+                          ? const Color(0xFFDFD0B8)
+                          : const Color(0xFF222831),
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'DMSerif'),
                   decoration: InputDecoration(
                     hintText: 'Search by username (min 2 characters)...',
                     hintStyle: TextStyle(
@@ -561,6 +561,7 @@ class _SearchUserScreenState extends State<SearchUserScreen>
                           color: isDark
                               ? const Color(0xFFDFD0B8)
                               : const Color(0xFF222831),
+                          fontFamily: 'DMSerif',
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -572,6 +573,7 @@ class _SearchUserScreenState extends State<SearchUserScreen>
                               ? const Color(0xFF948979)
                               : const Color(0xFF393E46),
                           fontWeight: FontWeight.w500,
+                          fontFamily: 'DMSerif',
                         ),
                       ),
                     ],

@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:bullbearnews/screens/market/crypto_detail_screen.dart';
+import 'package:bullbearnews/services/firebase_favorites_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/crypto_model.dart';
 import '../../services/crypto_service.dart';
 
@@ -23,11 +23,15 @@ enum SortOption {
   favoritesFirst,
 }
 
-class _MarketScreenState extends State<MarketScreen> {
+class _MarketScreenState extends State<MarketScreen>
+    with TickerProviderStateMixin {
   final CryptoService _cryptoService = CryptoService();
+  final FirebaseFavoritesService _favoritesService = FirebaseFavoritesService();
+
   List<CryptoModel> _cryptoList = [];
   List<CryptoModel> _filteredList = [];
   bool _isLoading = true;
+  bool _isRefreshing = false;
   String _errorMessage = '';
   SortOption _currentSortOption = SortOption.marketCapDesc;
   String _searchQuery = '';
@@ -37,12 +41,48 @@ class _MarketScreenState extends State<MarketScreen> {
   Timer? _refreshTimer;
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
+  StreamSubscription<Set<String>>? _favoritesSubscription;
+
+  // Animation controllers
+  late AnimationController _animationController;
+  late Animation<double> _headerAnimation;
+  late Animation<double> _hideAnimation;
+  late AnimationController _refreshAnimationController;
+  late Animation<double> _refreshAnimation;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_scrollListener);
     _loadInitialData();
+
+    // Initialize animations
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _headerAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeOut,
+    );
+    _hideAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Curves.easeOut,
+      ),
+    );
+    _animationController.forward();
+
+    _refreshAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _refreshAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _refreshAnimationController,
+        curve: Curves.easeInOut,
+      ),
+    );
   }
 
   @override
@@ -50,6 +90,9 @@ class _MarketScreenState extends State<MarketScreen> {
     _scrollController.dispose();
     _searchDebounce?.cancel();
     _refreshTimer?.cancel();
+    _favoritesSubscription?.cancel();
+    _animationController.dispose();
+    _refreshAnimationController.dispose();
     super.dispose();
   }
 
@@ -73,35 +116,124 @@ class _MarketScreenState extends State<MarketScreen> {
   }
 
   Future<void> _loadFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _favoriteCryptos =
-          Set<String>.from(prefs.getStringList('favoriteCryptos') ?? []);
-    });
-  }
+    try {
+      // Firebase'den favorileri al
+      final favorites = await _favoritesService.getFavoriteCryptos();
 
-  Future<void> _saveFavorites() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('favoriteCryptos', _favoriteCryptos.toList());
+      // Realtime updates için stream dinle
+      _favoritesSubscription?.cancel();
+      _favoritesSubscription = _favoritesService.watchFavoriteCryptos().listen(
+        (favorites) {
+          if (mounted) {
+            setState(() {
+              _favoriteCryptos = favorites;
+              // Kripto listesindeki isFavorite durumlarını güncelle
+              for (var crypto in _cryptoList) {
+                crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
+              }
+              _filterCryptoList();
+            });
+          }
+        },
+        onError: (error) {
+          debugPrint('Favorites stream error: $error');
+          // Fallback olarak mevcut listeyi kullan
+        },
+      );
+
+      if (mounted) {
+        setState(() {
+          _favoriteCryptos = favorites;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading favorites: $e');
+      // Hata durumunda boş set kullan
+      if (mounted) {
+        setState(() {
+          _favoriteCryptos = <String>{};
+        });
+      }
+    }
   }
 
   Future<void> _toggleFavorite(String id) async {
-    if (mounted) {
-      setState(() {
-        if (_favoriteCryptos.contains(id)) {
-          _favoriteCryptos.remove(id);
-        } else {
-          _favoriteCryptos.add(id);
-        }
+    try {
+      // Optimistic update - UI'ı hemen güncelle
+      final wasInFavorites = _favoriteCryptos.contains(id);
+      if (mounted) {
+        setState(() {
+          if (wasInFavorites) {
+            _favoriteCryptos.remove(id);
+          } else {
+            _favoriteCryptos.add(id);
+          }
 
-        for (var crypto in _cryptoList) {
-          crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
-        }
+          for (var crypto in _cryptoList) {
+            crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
+          }
 
-        _filterCryptoList();
-      });
+          _filterCryptoList();
+        });
+      }
+
+      // Firebase'e kaydet
+      await _favoritesService.toggleFavoriteCrypto(id);
+
+      // Başarılı mesajı göster
+      if (mounted) {
+        final crypto = _cryptoList.firstWhere((c) => c.id == id);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              wasInFavorites
+                  ? '${crypto.name} removed from favorites'
+                  : '${crypto.name} added to favorites',
+            ),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Hata durumunda UI'ı geri al
+      if (mounted) {
+        setState(() {
+          if (_favoriteCryptos.contains(id)) {
+            _favoriteCryptos.remove(id);
+          } else {
+            _favoriteCryptos.add(id);
+          }
+
+          for (var crypto in _cryptoList) {
+            crypto.isFavorite = _favoriteCryptos.contains(crypto.id);
+          }
+
+          _filterCryptoList();
+        });
+
+        // Hata mesajı göster
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Failed to update favorite: $e')),
+              ],
+            ),
+            backgroundColor: Colors.red.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
     }
-    await _saveFavorites();
   }
 
   void _sortCryptoList() {
@@ -146,9 +278,36 @@ class _MarketScreenState extends State<MarketScreen> {
     _sortCryptoList();
   }
 
-  Future<void> _loadCryptoData() async {
+  Future<void> _handleRefresh() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    _refreshAnimationController.repeat();
+
+    try {
+      await Future.wait([
+        _loadCryptoData(forceRefresh: true),
+        _loadFavorites(), // Favorileri de yenile
+      ]);
+      await Future.delayed(const Duration(milliseconds: 500));
+    } finally {
+      _refreshAnimationController.stop();
+      _refreshAnimationController.reset();
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCryptoData({bool forceRefresh = false}) async {
     final now = DateTime.now();
-    if (_lastRefreshTime != null &&
+    if (!forceRefresh &&
+        _lastRefreshTime != null &&
         now.difference(_lastRefreshTime!).inSeconds < 30) {
       if (_cachedCryptoList.isNotEmpty) {
         setState(() {
@@ -160,7 +319,10 @@ class _MarketScreenState extends State<MarketScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (!_isRefreshing) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final newData = await _cryptoService.getCryptoData();
 
@@ -197,7 +359,9 @@ class _MarketScreenState extends State<MarketScreen> {
         }
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted && !_isRefreshing) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -225,7 +389,6 @@ class _MarketScreenState extends State<MarketScreen> {
     );
   }
 
-  // Crypto ikonları için yerel widget
   Widget _buildCryptoIcon(CryptoModel crypto) {
     return Container(
       width: 40,
@@ -256,7 +419,6 @@ class _MarketScreenState extends State<MarketScreen> {
           ),
         ),
         errorWidget: (context, url, error) {
-          // Fallback olarak crypto simgesi veya harfler göster
           return Container(
             width: 40,
             height: 40,
@@ -288,30 +450,193 @@ class _MarketScreenState extends State<MarketScreen> {
         httpHeaders: const {
           'User-Agent': 'Mozilla/5.0 (compatible; BullBearNews/1.0)',
         },
-        cacheManager: null, // Varsayılan cache manager kullan
+        cacheManager: null,
         maxHeightDiskCache: 100,
         maxWidthDiskCache: 100,
       ),
     );
   }
 
-  // Crypto sembolüne göre renk üret
   Color _getCryptoColor(String symbol) {
     final colors = [
-      const Color(0xFFFF6B6B), // Kırmızı
-      const Color(0xFF4ECDC4), // Turkuaz
-      const Color(0xFF45B7D1), // Mavi
-      const Color(0xFF96CEB4), // Yeşil
-      const Color(0xFFFECA57), // Sarı
-      const Color(0xFFFF9FF3), // Pembe
-      const Color(0xFF54A0FF), // Açık mavi
-      const Color(0xFF5F27CD), // Mor
-      const Color(0xFFFF9F43), // Turuncu
-      const Color(0xFF1DD1A1), // Mint yeşili
+      const Color(0xFFFF6B6B),
+      const Color(0xFF4ECDC4),
+      const Color(0xFF45B7D1),
+      const Color(0xFF96CEB4),
+      const Color(0xFFFECA57),
+      const Color(0xFFFF9FF3),
+      const Color(0xFF54A0FF),
+      const Color(0xFF5F27CD),
+      const Color(0xFFFF9F43),
+      const Color(0xFF1DD1A1),
     ];
 
     final hash = symbol.hashCode;
     return colors[hash.abs() % colors.length];
+  }
+
+  Widget _buildHeader(bool isDark) {
+    return AnimatedBuilder(
+      animation: _headerAnimation,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(0, 30 * (1 - _headerAnimation.value)),
+          child: Opacity(
+            opacity: _headerAnimation.value,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    const Color(0xFF393E46),
+                                    const Color(0xFF948979),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(Icons.trending_up,
+                                  color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Crypto Market',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                color: isDark
+                                    ? const Color(0xFFDFD0B8)
+                                    : const Color(0xFF222831),
+                                letterSpacing: -0.5,
+                                fontFamily: 'DMSerif',
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Track and analyze cryptocurrency prices',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDark
+                                ? const Color(0xFF948979)
+                                : const Color(0xFF393E46),
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'DMSerif',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedBuilder(
+                    animation: _refreshAnimation,
+                    builder: (context, child) {
+                      return IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _isRefreshing
+                                ? (isDark ? Colors.blue[700] : Colors.blue[100])
+                                : (isDark
+                                    ? Colors.grey[800]
+                                    : Colors.grey[200]),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Transform.rotate(
+                            angle: _refreshAnimation.value * 2 * 3.14159,
+                            child: Icon(
+                              Icons.refresh,
+                              color: _isRefreshing
+                                  ? (isDark
+                                      ? Colors.blue[300]
+                                      : Colors.blue[600])
+                                  : (isDark ? Colors.white : Colors.black),
+                              size: 20,
+                            ),
+                          ),
+                        ),
+                        onPressed: _isRefreshing ? null : _handleRefresh,
+                        tooltip:
+                            _isRefreshing ? 'Refreshing...' : 'Refresh data',
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadingOverlay() {
+    if (!_isRefreshing) return const SizedBox.shrink();
+
+    return Container(
+      color: Colors.black.withOpacity(0.4),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              AnimatedBuilder(
+                animation: _refreshAnimation,
+                builder: (context, child) {
+                  return Transform.rotate(
+                    angle: _refreshAnimation.value * 2 * 3.14159,
+                    child: Icon(
+                      Icons.refresh,
+                      size: 32,
+                      color: Theme.of(context).primaryColor,
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Refreshing data...',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Please wait while we update the crypto prices',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).textTheme.bodySmall?.color,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -319,126 +644,131 @@ class _MarketScreenState extends State<MarketScreen> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Crypto Market',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(top: 10.0),
-            child: IconButton(
-              icon: const Icon(Icons.refresh_sharp, size: 30),
-              onPressed: _loadCryptoData,
-            ),
-          ),
-        ],
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
-        toolbarHeight: 60,
-      ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
-        mainAxisSize: MainAxisSize.max,
+      body: Stack(
         children: [
-          // Arama çubuğu
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12),
-            child: TextField(
-              style: TextStyle(
-                color: isDarkMode ? Colors.white : Colors.black,
-              ),
-              cursorColor: isDarkMode ? Colors.white : Colors.black,
-              cursorHeight: 20,
-              cursorWidth: 2,
-              textAlignVertical: TextAlignVertical.center,
-              textAlign: TextAlign.start,
-              decoration: InputDecoration(
-                hintText: 'Search crypto...',
-                prefixIcon:
-                    const Icon(Icons.search, size: 20, color: Colors.grey),
-                hintStyle: TextStyle(
-                  color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!,
-                  ),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                filled: true,
-                fillColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(
-                    color: isDarkMode ? Colors.grey[800]! : Colors.grey[200]!,
-                  ),
-                ),
-              ),
-              onChanged: (value) {
-                _searchDebounce?.cancel();
-                _searchDebounce = Timer(const Duration(milliseconds: 500), () {
-                  if (mounted) {
-                    setState(() {
-                      _searchQuery = value;
-                      _filterCryptoList();
-                    });
-                  }
-                });
-              },
-            ),
-          ),
-
-          // Sıralama seçenekleri
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
+          SafeArea(
+            child: Column(
               children: [
-                _buildSortChip('Market Cap', SortOption.marketCapDesc),
-                _buildSortChip('Highest Price', SortOption.priceDesc),
-                _buildSortChip('Lowest price', SortOption.priceAsc),
-                _buildSortChip('Most Increased', SortOption.changeDesc),
-                _buildSortChip('Most Decreased', SortOption.changeAsc),
-                _buildSortChip('Favorites First', SortOption.favoritesFirst),
+                AnimatedBuilder(
+                  animation: _hideAnimation,
+                  builder: (context, child) {
+                    return ClipRect(
+                      child: Align(
+                        alignment: Alignment.topCenter,
+                        heightFactor: _hideAnimation.value,
+                        child: Transform.translate(
+                          offset: Offset(0, -50 * (1 - _hideAnimation.value)),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _buildHeader(isDarkMode),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8.0, vertical: 12),
+                  child: TextField(
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                    ),
+                    cursorColor: isDarkMode ? Colors.white : Colors.black,
+                    cursorHeight: 20,
+                    cursorWidth: 2,
+                    textAlignVertical: TextAlignVertical.center,
+                    textAlign: TextAlign.start,
+                    decoration: InputDecoration(
+                      hintText: 'Search crypto...',
+                      prefixIcon: const Icon(Icons.search,
+                          size: 20, color: Colors.grey),
+                      hintStyle: TextStyle(
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDarkMode
+                              ? Colors.grey[800]!
+                              : Colors.grey[200]!,
+                        ),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      filled: true,
+                      fillColor:
+                          isDarkMode ? Colors.grey[800] : Colors.grey[200],
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                          color: isDarkMode
+                              ? Colors.grey[800]!
+                              : Colors.grey[200]!,
+                        ),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      _searchDebounce?.cancel();
+                      _searchDebounce =
+                          Timer(const Duration(milliseconds: 500), () {
+                        if (mounted) {
+                          setState(() {
+                            _searchQuery = value;
+                            _filterCryptoList();
+                          });
+                        }
+                      });
+                    },
+                  ),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(
+                    children: [
+                      _buildSortChip('Market Cap', SortOption.marketCapDesc),
+                      _buildSortChip('Highest Price', SortOption.priceDesc),
+                      _buildSortChip('Lowest price', SortOption.priceAsc),
+                      _buildSortChip('Most Increased', SortOption.changeDesc),
+                      _buildSortChip('Most Decreased', SortOption.changeAsc),
+                      _buildSortChip(
+                          'Favorites First', SortOption.favoritesFirst),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _errorMessage.isNotEmpty
+                          ? Center(child: Text(_errorMessage))
+                          : _filteredList.isEmpty
+                              ? const Center(child: Text('No results found!'))
+                              : RefreshIndicator(
+                                  onRefresh: _loadCryptoData,
+                                  child: ListView.separated(
+                                    controller: _scrollController,
+                                    itemCount: _filteredList.length,
+                                    separatorBuilder: (context, index) =>
+                                        const SizedBox(height: 8),
+                                    itemBuilder: (context, index) {
+                                      final crypto = _filteredList[index];
+                                      final isPositive =
+                                          crypto.priceChangePercentage24h >= 0;
+
+                                      return _buildCryptoItem(context, crypto,
+                                          isDarkMode, isPositive);
+                                    },
+                                  ),
+                                ),
+                ),
               ],
             ),
           ),
-
-          const SizedBox(height: 8),
-
-          // Kripto listesi
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _errorMessage.isNotEmpty
-                    ? Center(child: Text(_errorMessage))
-                    : _filteredList.isEmpty
-                        ? const Center(child: Text('No results found!'))
-                        : RefreshIndicator(
-                            onRefresh: _loadCryptoData,
-                            child: ListView.separated(
-                              controller: _scrollController,
-                              itemCount: _filteredList.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (context, index) {
-                                final crypto = _filteredList[index];
-                                final isPositive =
-                                    crypto.priceChangePercentage24h >= 0;
-
-                                return _buildCryptoItem(
-                                    context, crypto, isDarkMode, isPositive);
-                              },
-                            ),
-                          ),
-          ),
+          _buildLoadingOverlay(),
         ],
       ),
     );
@@ -451,7 +781,7 @@ class _MarketScreenState extends State<MarketScreen> {
     return InkWell(
       onTap: () => _navigateToDetail(crypto),
       child: Card(
-        color: Theme.of(context).cardColor,
+        color: Theme.of(context).cardTheme.color,
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
@@ -465,11 +795,8 @@ class _MarketScreenState extends State<MarketScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             mainAxisSize: MainAxisSize.max,
             children: [
-              // Leading - Crypto image (Güncellendi)
               _buildCryptoIcon(crypto),
-
               const SizedBox(width: 12),
-              // Middle - Crypto name, symbol, market cap
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,7 +828,7 @@ class _MarketScreenState extends State<MarketScreen> {
                       ],
                     ),
                     Text(
-                      'Market Cap: \$${_formatNumber(crypto.marketCap)}',
+                      'Market Cap: \${_formatNumber(crypto.marketCap)}',
                       style: TextStyle(
                         fontSize: 12,
                         color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
@@ -519,8 +846,6 @@ class _MarketScreenState extends State<MarketScreen> {
                   ],
                 ),
               ),
-
-              // Right side - Price and change percentage
               Expanded(
                 flex: 2,
                 child: Row(
@@ -566,7 +891,6 @@ class _MarketScreenState extends State<MarketScreen> {
                       ],
                     ),
                     const SizedBox(width: 4),
-                    // Favorite button
                     IconButton(
                       icon: Icon(
                         crypto.isFavorite ? Icons.star : Icons.star_border,
@@ -605,30 +929,60 @@ class _MarketScreenState extends State<MarketScreen> {
     final isSelected = _currentSortOption == option;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: FilterChip(
-        label: Text(
-          label,
-          style: TextStyle(
-            color: isSelected
-                ? (isDarkMode ? Colors.white : Colors.white)
-                : (isDarkMode ? Colors.white : Colors.black),
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.only(right: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              _currentSortOption = option;
+              _sortCryptoList();
+            });
+          },
+          borderRadius: BorderRadius.circular(25),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: [
+                        const Color(0xFF393E46),
+                        const Color(0xFF948979),
+                      ],
+                    )
+                  : null,
+              color: !isSelected
+                  ? (isDarkMode
+                      ? const Color(0xFF393E46).withOpacity(0.3)
+                      : Colors.white.withOpacity(0.7))
+                  : null,
+              borderRadius: BorderRadius.circular(25),
+              border: Border.all(
+                color: isSelected
+                    ? Colors.transparent
+                    : (isDarkMode
+                        ? const Color(0xFF948979).withOpacity(0.3)
+                        : const Color(0xFF393E46).withOpacity(0.2)),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected
+                    ? const Color(0xFFDFD0B8)
+                    : (isDarkMode
+                        ? const Color(0xFF948979)
+                        : const Color(0xFF393E46)),
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 14,
+                fontFamily: 'DMSerif',
+              ),
+            ),
           ),
         ),
-        selected: isSelected,
-        onSelected: (selected) {
-          setState(() {
-            _currentSortOption = option;
-            _sortCryptoList();
-          });
-        },
-        backgroundColor: isDarkMode ? Colors.grey[800] : Colors.grey[200],
-        selectedColor:
-            isDarkMode ? const Color(0xFF8A2BE2) : const Color(0xFF8A2BE2),
-        checkmarkColor: isDarkMode ? Colors.black : Colors.white,
       ),
     );
   }
@@ -638,7 +992,7 @@ class _MarketScreenState extends State<MarketScreen> {
       return '${(number / 1000000000).toStringAsFixed(2)}B';
     } else if (number >= 1000000) {
       return '${(number / 1000000).toStringAsFixed(2)}M';
-    } else if (number >= 1000) {
+    } else if (number >= 1000000) {
       return '${(number / 1000).toStringAsFixed(2)}K';
     } else {
       return number.toString();

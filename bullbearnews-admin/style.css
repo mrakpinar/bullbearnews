@@ -1,73 +1,89 @@
 body {
     background-color: #f8f9fa;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    
 }
 
-.navbar {
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
+/* Sidebar */
 .sidebar {
-    height: 100vh;
     position: fixed;
-    top: 56px; /* Navbar yüksekliği */
+    top: 0;
+    bottom: 0;
     left: 0;
-    width: 250px;
-    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
-    padding-top: 20px;
+    z-index: 100;
+    padding: 56px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    background-color: #f8f9fa;
 }
 
 .sidebar .nav-link {
+    font-weight: 500;
     color: #333;
-    padding: 10px 20px;
-    border-radius: 4px;
-    margin: 5px 0;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid transparent;
 }
 
 .sidebar .nav-link.active {
-    background-color: #0d6efd;
-    color: white;
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+    border-left-color: #0d6efd;
 }
 
 .sidebar .nav-link:hover {
-    background-color: #e9ecef;
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
 }
 
-.main-content {
-    margin-left: 250px; /* Sidebar genişliği */
-    padding: 20px;
+.sidebar .nav-link i {
+    margin-right: 4px;
+    color: #727272;
 }
 
+.sidebar .nav-link.active i,
+.sidebar .nav-link:hover i {
+    color: inherit;
+}
+
+/* Main content */
+main {
+    padding-top: 1.5rem;
+}
+
+/* Cards */
 .card {
     border: none;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
 }
 
 .card-header {
-    border-radius: 8px 8px 0 0;
+    background-color: white;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    font-weight: 600;
 }
 
-.table-hover tbody tr:hover {
+/* Tables */
+.table-responsive {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    font-weight: 600;
     background-color: #f8f9fa;
 }
 
-.badge {
-    font-size: 0.9em;
-    padding: 0.5em 0.75em;
-    border-radius: 0.25em;
+/* Forms */
+.form-control, .form-select {
+    padding: 0.5rem 0.75rem;
 }
 
-.badge.bg-primary {
-    background-color: #0d6efd !important;
-}
-
-.badge.bg-success {
-    background-color: #198754 !important;
-}
-
-#image-preview {
+/* Image previews */
+#image-preview, #announcement-preview {
     max-height: 200px;
     object-fit: contain;
     border: 1px solid #ddd;
@@ -75,18 +91,20 @@ body {
     padding: 5px;
 }
 
-.news-thumbnail {
-    width: 60px;
-    height: 60px;
+.news-thumbnail, .video-thumbnail {
     object-fit: cover;
     border-radius: 4px;
 }
 
-#user-info {
-    display: flex;
-    align-items: center;
-}
-
-#user-email {
-    font-weight: 500;
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+    .sidebar {
+        position: static;
+        height: auto;
+        padding-top: 0;
+    }
+    
+    main {
+        padding-top: 1rem;
+    }
 }

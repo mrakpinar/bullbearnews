@@ -1,6 +1,6 @@
 import 'package:bullbearnews/models/crypto_model.dart';
-import 'package:bullbearnews/screens/profile/portfolio_detail_screen.dart';
-import 'package:bullbearnews/screens/profile/wallets_screen.dart';
+import 'package:bullbearnews/screens/profile/portfolio/portfolio_detail_screen.dart';
+import 'package:bullbearnews/screens/profile/wallet/wallets_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -175,7 +175,29 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     if (_isLoading) {
-      return Center(child: CircularProgressIndicator());
+      return Center(
+        child: Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Theme.of(context).cardTheme.color,
+            border: Border.all(
+              color: isDarkMode
+                  ? const Color(0xFFE0E0E0).withOpacity(0.5)
+                  : const Color(0xFF393E46).withOpacity(0.3),
+              width: 0.5,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 26.0),
+            child: Center(
+              child: CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.secondary,
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     if (_errorMessage.isNotEmpty) {
@@ -199,9 +221,9 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDarkMode
-              ? const Color(0xFF393E46).withOpacity(0.3)
-              : const Color(0xFFE0E0E0).withOpacity(0.5),
-          width: 1,
+              ? const Color(0xFFE0E0E0).withOpacity(0.5)
+              : const Color(0xFF393E46).withOpacity(0.3),
+          width: 0.3,
         ),
         boxShadow: [
           BoxShadow(
