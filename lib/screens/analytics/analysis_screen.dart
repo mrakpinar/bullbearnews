@@ -6,11 +6,14 @@ import 'package:bullbearnews/services/crypto_service.dart';
 import 'package:bullbearnews/services/premium_analysis_service.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_analysis_card.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_direct_history_section.dart';
+import 'package:bullbearnews/widgets/analysis/analysis_limit_card_widget.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_quick_coin_selection_widget.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_tab_bar_widget.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_loading_overlay.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_header.dart';
 import 'package:bullbearnews/widgets/analysis/analysis_form.dart';
+import 'package:bullbearnews/widgets/analysis/premium_info_card.dart';
+import 'package:bullbearnews/widgets/analysis/premium_status_bar_widget.dart';
 import 'package:flutter/material.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -53,9 +56,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   int _remainingAnalyses = 1;
   int _todayAnalysisCount = 0;
 
+  // Timer'ları bir arada toplayalım
   Timer? _formAnimationDelayTimer;
   Timer? _historyAnimationDelayTimer;
   Timer? _tabAnimationDelayTimer;
+  Timer? _searchDebounceTimer; // Arama için debounce timer
 
   // Coin selection
   List<CryptoModel> _availableCoins = [];
@@ -65,36 +70,83 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   bool _showCoinDropdown = false;
 
   // Quick selection coins
-  final List<String> _quickCoins = ['BTC', 'ETH', 'BNB', 'ADA', 'SOL'];
+  static const List<String> _quickCoins = ['BTC', 'ETH', 'BNB', 'ADA', 'SOL'];
 
-  bool get _isVolumeValid =>
-      double.tryParse(_volumeController.text) != null &&
-      double.parse(_volumeController.text) > 0;
+  // Cached computed values
+  bool? _cachedIsVolumeValid;
+  String? _cachedVolumeText;
+  bool? _cachedCanAnalyze;
 
-  bool get _canAnalyze =>
-      _selectedCoin != null &&
-      _isVolumeValid &&
-      !_isLoading &&
-      (_isPremium || _remainingAnalyses > 0);
+  // Getters - cache edilmiş değerleri kullan
+  bool get _isVolumeValid {
+    if (_cachedVolumeText != _volumeController.text ||
+        _cachedIsVolumeValid == null) {
+      _cachedVolumeText = _volumeController.text;
+      _cachedIsVolumeValid = double.tryParse(_volumeController.text) != null &&
+          double.parse(_volumeController.text) > 0;
+    }
+    return _cachedIsVolumeValid!;
+  }
+
+  bool get _canAnalyze {
+    // Cache kontrolü ekleyelim
+    _cachedCanAnalyze ??= _selectedCoin != null &&
+        _isVolumeValid &&
+        !_isLoading &&
+        (_isPremium || _remainingAnalyses > 0);
+    return _cachedCanAnalyze!;
+  }
+
+  // Cache invalidation
+  void _invalidateCache() {
+    _cachedCanAnalyze = null;
+    _cachedIsVolumeValid = null;
+    _cachedVolumeText = null;
+  }
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _initializeAnimations();
-    _loadPremiumStatus();
-    _loadAnalysisHistory();
-    _loadPremiumHistoryCount();
-    _loadAvailableCoins();
+
+    // Async işlemleri batch olarak yapalım
+    _initializeDataAsync();
+
+    // Volume controller listener ekleyelim
+    _volumeController.addListener(_onVolumeChanged);
+  }
+
+  // Async initialization işlemlerini batch olarak yapalım
+  Future<void> _initializeDataAsync() async {
+    await Future.wait([
+      _loadPremiumStatus(),
+      _loadAnalysisHistory(),
+      _loadPremiumHistoryCount(),
+      _loadAvailableCoins(),
+    ]);
+
     _setDefaultVolume();
     _updateHistoryCount();
+  }
+
+  void _onVolumeChanged() {
+    // Debounce ile cache invalidation
+    _invalidateCache();
+
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        setState(() {}); // Sadece gerektiğinde rebuild
+      }
+    });
   }
 
   void _setDefaultVolume() {
     _volumeController.text = '10000000';
   }
 
-  // Premium history count yükle
+  // Premium history count yükle - optimize edilmiş
   Future<void> _loadPremiumHistoryCount() async {
     try {
       final history = await PremiumAnalysisService.getAnalysisHistory();
@@ -104,47 +156,67 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         });
       }
     } catch (e) {
-      print('Error loading premium history count: $e');
+      debugPrint('Error loading premium history count: $e');
     }
   }
 
-  // Premium durumunu yükle
+  // Premium durumunu yükle - optimize edilmiş
   Future<void> _loadPremiumStatus() async {
-    final isPremium = await PremiumAnalysisService.isPremiumUser();
-    final remaining = await PremiumAnalysisService.getRemainingAnalyses();
-    final todayCount = await PremiumAnalysisService.getTodayAnalysisCount();
+    try {
+      final results = await Future.wait([
+        PremiumAnalysisService.isPremiumUser(),
+        PremiumAnalysisService.getRemainingAnalyses(),
+        PremiumAnalysisService.getTodayAnalysisCount(),
+      ]);
 
-    if (mounted) {
-      setState(() {
-        _isPremium = isPremium;
-        _remainingAnalyses = remaining;
-        _todayAnalysisCount = todayCount;
-      });
+      if (mounted) {
+        setState(() {
+          _isPremium = results[0] as bool;
+          _remainingAnalyses = results[1] as int;
+          _todayAnalysisCount = results[2] as int;
+        });
+        _invalidateCache(); // Premium durumu değiştiğinde cache'i invalidate et
+      }
+    } catch (e) {
+      debugPrint('Error loading premium status: $e');
     }
   }
 
   void _initializeAnimations() {
+    // Animation controller'ları tek seferde oluşturalım
+    final controllers = <AnimationController>[];
+
     _headerAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
+    controllers.add(_headerAnimationController);
+
     _formAnimationController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+    controllers.add(_formAnimationController);
+
     _historyAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
+    controllers.add(_historyAnimationController);
+
     _tabAnimationController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
+    controllers.add(_tabAnimationController);
+
     _loadingAnimationController = AnimationController(
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
+    controllers.add(_loadingAnimationController);
 
+    // Animation'ları tek seferde oluşturalım
     _headerAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
           parent: _headerAnimationController, curve: Curves.easeOut),
@@ -164,15 +236,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           parent: _loadingAnimationController, curve: Curves.easeInOut),
     );
 
+    // Staggered animation'ları başlat
+    _startStaggeredAnimations();
+  }
+
+  void _startStaggeredAnimations() {
     if (mounted) {
       _headerAnimationController.forward();
+
       _formAnimationDelayTimer = Timer(const Duration(milliseconds: 200), () {
         if (mounted) _tabAnimationController.forward();
       });
+
       _historyAnimationDelayTimer =
           Timer(const Duration(milliseconds: 400), () {
         if (mounted) _formAnimationController.forward();
       });
+
       Timer(const Duration(milliseconds: 500), () {
         if (mounted) _historyAnimationController.forward();
       });
@@ -183,17 +263,26 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
     try {
       final coins = await _cryptoService.getCryptoData();
       if (!mounted) return;
+
       setState(() {
+        // Sadece ilk 50 coin'i alalım performans için
         _availableCoins = coins.take(100).toList();
         _filteredCoins = _availableCoins;
         _isLoadingCoins = false;
 
         // Bitcoin'i varsayılan olarak seç
-        _selectedCoin = _availableCoins.firstWhere(
-          (coin) => coin.symbol.toLowerCase() == 'btc',
-          orElse: () => _availableCoins.first,
-        );
+        if (_availableCoins.isNotEmpty) {
+          try {
+            _selectedCoin = _availableCoins.firstWhere(
+              (coin) => coin.symbol.toLowerCase() == 'btc',
+            );
+          } catch (e) {
+            _selectedCoin = _availableCoins.first;
+          }
+        }
       });
+
+      _invalidateCache();
     } catch (e) {
       if (!mounted) return;
 
@@ -208,15 +297,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   void _filterCoins(String query) {
-    setState(() {
-      if (query.isEmpty) {
-        _filteredCoins = _availableCoins;
-      } else {
-        _filteredCoins = _availableCoins.where((coin) {
-          return coin.name.toLowerCase().contains(query.toLowerCase()) ||
-              coin.symbol.toLowerCase().contains(query.toLowerCase());
-        }).toList();
-      }
+    // Debounce ekleyelim
+    _searchDebounceTimer?.cancel();
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+
+      setState(() {
+        if (query.isEmpty) {
+          _filteredCoins = _availableCoins;
+        } else {
+          final lowerQuery = query.toLowerCase();
+          _filteredCoins = _availableCoins.where((coin) {
+            return coin.name.toLowerCase().contains(lowerQuery) ||
+                coin.symbol.toLowerCase().contains(lowerQuery);
+          }).toList();
+        }
+      });
     });
   }
 
@@ -227,83 +323,111 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       _coinSearchController.clear();
       _filteredCoins = _availableCoins;
     });
+    _invalidateCache();
   }
 
   void _onQuickCoinSelected(String symbol) {
-    final coin = _availableCoins.firstWhere(
-      (coin) => coin.symbol.toLowerCase() == symbol.toLowerCase(),
-      orElse: () => _availableCoins.first,
-    );
+    if (_availableCoins.isEmpty) return;
+
+    CryptoModel? coin;
+    try {
+      coin = _availableCoins.firstWhere(
+        (coin) => coin.symbol.toLowerCase() == symbol.toLowerCase(),
+      );
+    } catch (e) {
+      coin = _availableCoins.first;
+    }
+
     _onCoinSelected(coin);
   }
 
   @override
   void dispose() {
+    // Timer'ları temizleyelim
     _formAnimationDelayTimer?.cancel();
     _historyAnimationDelayTimer?.cancel();
     _tabAnimationDelayTimer?.cancel();
+    _searchDebounceTimer?.cancel();
 
-    if (mounted) {
-      _headerAnimationController.dispose();
-      _formAnimationController.dispose();
-      _historyAnimationController.dispose();
-      _tabAnimationController.dispose();
-      _loadingAnimationController.dispose();
-      _tabController.dispose();
-    }
+    // Animation controller'ları dispose edelim
+    _headerAnimationController.dispose();
+    _formAnimationController.dispose();
+    _historyAnimationController.dispose();
+    _tabAnimationController.dispose();
+    _loadingAnimationController.dispose();
+    _tabController.dispose();
+
+    // Text controller'ları dispose edelim
+    _volumeController.removeListener(_onVolumeChanged);
     _volumeController.dispose();
     _coinSearchController.dispose();
+
     super.dispose();
   }
 
   Future<void> _loadAnalysisHistory() async {
-    final history = await PremiumAnalysisService.getLegacyAnalysisHistory();
-    if (mounted) {
-      setState(() => _analysisHistory = history);
+    try {
+      final history = await PremiumAnalysisService.getLegacyAnalysisHistory();
+      if (mounted) {
+        setState(() => _analysisHistory = history);
+      }
+    } catch (e) {
+      debugPrint('Error loading analysis history: $e');
     }
   }
 
   Future<void> _saveAnalysisHistory() async {
-    await PremiumAnalysisService.saveLegacyAnalysisHistory(_analysisHistory);
+    try {
+      await PremiumAnalysisService.saveLegacyAnalysisHistory(_analysisHistory);
+    } catch (e) {
+      debugPrint('Error saving analysis history: $e');
+    }
   }
 
-  // History count'u güncelle
+  // History count'u güncelle - optimize edilmiş
   Future<void> _updateHistoryCount() async {
-    await _loadAnalysisHistory();
-    await _loadPremiumHistoryCount();
+    await Future.wait([
+      _loadAnalysisHistory(),
+      _loadPremiumHistoryCount(),
+    ]);
   }
 
   Future<void> _addAnalysis(String text, String coinName) async {
-    // Premium analiz kaydetme
-    await PremiumAnalysisService.saveLegacyAnalysisToHistory(
-      analysis: text,
-      coinName: coinName,
-      coinSymbol: _selectedCoin?.symbol,
-      price: _selectedCoin?.currentPrice,
-    );
+    try {
+      // Premium analiz kaydetme
+      await PremiumAnalysisService.saveLegacyAnalysisToHistory(
+        analysis: text,
+        coinName: coinName,
+        coinSymbol: _selectedCoin?.symbol,
+        price: _selectedCoin?.currentPrice,
+      );
 
-    // Legacy format için de kaydet
-    setState(() {
-      _analysisHistory.insert(0, {
-        'text': text,
-        'coin': coinName,
-        'expanded': false,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
+      // Legacy format için de kaydet
+      setState(() {
+        _analysisHistory.insert(0, {
+          'text': text,
+          'coin': coinName,
+          'expanded': false,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        });
+
+        // Free kullanıcılar için limit kontrol
+        final maxItems = _isPremium ? 50 : 5;
+        if (_analysisHistory.length > maxItems) {
+          _analysisHistory = _analysisHistory.take(maxItems).toList();
+        }
       });
 
-      // Free kullanıcılar için limit kontrol
-      final maxItems = _isPremium ? 50 : 5;
-      if (_analysisHistory.length > maxItems) {
-        _analysisHistory = _analysisHistory.take(maxItems).toList();
-      }
-    });
-
-    await _saveAnalysisHistory();
-    // History count'u güncelle
-    await _loadPremiumHistoryCount();
+      await Future.wait([
+        _saveAnalysisHistory(),
+        _loadPremiumHistoryCount(),
+      ]);
+    } catch (e) {
+      debugPrint('Error adding analysis: $e');
+    }
   }
 
-  // Premium kontrol dialogu göster
+  // Premium kontrol dialogu göster - memoize edilmiş
   void _showPremiumDialog() {
     showDialog(
       context: context,
@@ -372,11 +496,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
           ),
           ElevatedButton(
             onPressed: () async {
-              // Test için premium aktif et
-              await PremiumAnalysisService.setPremiumStatus(true);
-              await _loadPremiumStatus();
-              Navigator.pop(context);
-              _showSuccessSnackBar('🎉 Premium activated for testing!');
+              try {
+                // Test için premium aktif et
+                await PremiumAnalysisService.setPremiumStatus(true);
+                await _loadPremiumStatus();
+                Navigator.pop(context);
+                _showSuccessSnackBar('🎉 Premium activated for testing!');
+              } catch (e) {
+                _showErrorSnackBar('Error activating premium: $e');
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
@@ -392,23 +520,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   Future<String?> _sendAnalysisRequest() async {
-    // Premium kontrolü
-    final canAnalyze = await PremiumAnalysisService.canMakeAnalysis();
-    if (!canAnalyze) {
-      _showPremiumDialog();
-      return null;
-    }
-
-    print('_sendAnalysisRequest başlatıldı');
-    print('Seçilen coin: ${_selectedCoin?.name}');
-    print('RSI: $_rsi');
-    print('MACD: $_macd');
-    print('Volume: ${_volumeController.text}');
-
-    setState(() => _isLoading = true);
-    _loadingAnimationController.forward();
-
     try {
+      // Premium kontrolü
+      final canAnalyze = await PremiumAnalysisService.canMakeAnalysis();
+      if (!canAnalyze) {
+        _showPremiumDialog();
+        return null;
+      }
+
+      debugPrint('_sendAnalysisRequest başlatıldı');
+      debugPrint('Seçilen coin: ${_selectedCoin?.name}');
+      debugPrint('RSI: $_rsi');
+      debugPrint('MACD: $_macd');
+      debugPrint('Volume: ${_volumeController.text}');
+
+      setState(() => _isLoading = true);
+      _invalidateCache();
+      _loadingAnimationController.forward();
+
       final result = await AnalyticsService.sendAnalysisRequest(
         coinName: _selectedCoin!.name,
         rsi: _rsi,
@@ -438,13 +567,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
         }
       }
     } catch (e) {
-      print('Hata: $e');
+      debugPrint('Hata: $e');
       if (mounted) {
         _showErrorSnackBar('❌ Error: $e');
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
+        _invalidateCache();
         _loadingAnimationController.reverse();
       }
     }
@@ -452,11 +582,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   void _showSuccessSnackBar(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            const Icon(Icons.check_circle, color: Colors.white, size: 20),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
@@ -470,11 +602,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   }
 
   void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
           children: [
-            Icon(Icons.error, color: Colors.white, size: 20),
+            const Icon(Icons.error, color: Colors.white, size: 20),
             const SizedBox(width: 8),
             Expanded(child: Text(message)),
           ],
@@ -500,14 +634,23 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
             child: Column(
               children: [
                 _buildHeader(isDark),
-                _buildPremiumStatusBar(isDark),
+                PremiumStatusBarWidget(
+                  isDark: isDark,
+                  analysisHistory: _analysisHistory,
+                  isPremium: _isPremium,
+                  loadPremiumStatus: _loadPremiumStatus,
+                  premiumHistoryCount: _premiumHistoryCount,
+                  showPremiumDialog: _showPremiumDialog,
+                  todayAnalysisCount: _todayAnalysisCount,
+                  showErrorSnackBar: () =>
+                      _showErrorSnackBar("Deactivated for testing!"),
+                ),
                 AnalaysisTabBarWidget(
                   isDark: isDark,
                   analysisHistory: _analysisHistory,
                   tabAnimation: _tabAnimation,
                   tabController: _tabController,
-                  premiumHistoryCount:
-                      _premiumHistoryCount, // Premium count ekle
+                  premiumHistoryCount: _premiumHistoryCount,
                 ),
                 Expanded(
                   child: _buildTabBarView(isDark),
@@ -531,152 +674,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
   Widget _buildHeader(bool isDark) {
     return AnalyticHeader(
       animation: _headerAnimation,
-      onRefresh: () {
-        _loadAnalysisHistory();
-        _loadAvailableCoins();
-        _loadPremiumStatus();
-        _loadPremiumHistoryCount(); // Premium count'u da yenile
+      onRefresh: () async {
+        await Future.wait([
+          _loadAnalysisHistory(),
+          _loadAvailableCoins(),
+          _loadPremiumStatus(),
+          _loadPremiumHistoryCount(),
+        ]);
       },
       isDark: isDark,
-    );
-  }
-
-  // Premium durum çubuğu
-  Widget _buildPremiumStatusBar(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: _isPremium
-              ? [
-                  Colors.orange.withOpacity(0.1),
-                  Colors.deepOrange.withOpacity(0.1)
-                ]
-              : [Colors.blue.withOpacity(0.1), Colors.indigo.withOpacity(0.1)],
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isPremium
-              ? Colors.orange.withOpacity(0.3)
-              : Colors.blue.withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: _isPremium ? Colors.orange : Colors.blue,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Icon(
-              _isPremium ? Icons.workspace_premium : Icons.analytics,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      _isPremium ? 'Premium User' : 'Free User',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? const Color(0xFFDFD0B8)
-                            : const Color(0xFF222831),
-                      ),
-                    ),
-                    if (_isPremium) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Text(
-                          '∞',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  _isPremium
-                      ? 'Unlimited analyses • $_premiumHistoryCount/50 history'
-                      : 'Today: $_todayAnalysisCount/1 • ${_analysisHistory.length}/5 history',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: _isPremium ? Colors.orange : Colors.blue,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (!_isPremium) ...[
-            GestureDetector(
-              onTap: _showPremiumDialog,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Colors.orange, Colors.deepOrange],
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: const Text(
-                  'Upgrade',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ] else ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: GestureDetector(
-                onTap: () async {
-                  // Test için premium'u kapat
-                  await PremiumAnalysisService.setPremiumStatus(false);
-                  await _loadPremiumStatus();
-                  _showErrorSnackBar('Premium deactivated for testing');
-                },
-                child: Text(
-                  'Active',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -696,7 +702,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
       child: Column(
         children: [
           // Premium bilgilendirme kartı (sadece free kullanıcılar için)
-          if (!_isPremium) _buildPremiumInfoCard(isDark),
+          if (!_isPremium)
+            PremiumInfoCard(
+              isDark: isDark,
+              analysisHistory: _analysisHistory,
+              formAnimation: _formAnimation,
+              showPremiumDialog: _showPremiumDialog,
+              todayAnalysisCount: _todayAnalysisCount,
+            ),
 
           // Quick coin selection
           AnalysisQuickCoinSelectionWidget(
@@ -727,14 +740,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               setState(() {
                 _rsi = value;
               });
+              _invalidateCache();
             },
             onMACDChanged: (value) {
               setState(() {
                 _macd = value;
               });
+              _invalidateCache();
             },
             onVolumeChanged: (text) {
-              setState(() {});
+              // Cache zaten _onVolumeChanged'de invalidate ediliyor
             },
             onCoinSelected: _onCoinSelected,
             onSearchChanged: _filterCoins,
@@ -753,7 +768,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
 
           // Analiz butonu durumu
           if (!_canAnalyze && _selectedCoin != null && _isVolumeValid)
-            _buildAnalysisLimitCard(isDark),
+            AnalysisLimitCardWidget(
+              showPremiumDialog: _showPremiumDialog,
+            ),
 
           // Son analiz sonucu
           if (_lastAnalysis != null)
@@ -764,250 +781,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen>
               selectedCoin: _selectedCoin,
               rsi: _rsi,
             ),
-        ],
-      ),
-    );
-  }
-
-  // Premium bilgilendirme kartı
-  Widget _buildPremiumInfoCard(bool isDark) {
-    return AnimatedBuilder(
-      animation: _formAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - _formAnimation.value)),
-          child: Opacity(
-            opacity: _formAnimation.value,
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.blue.withOpacity(0.1),
-                    Colors.indigo.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.withOpacity(0.3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(
-                          Icons.info_outline,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Free Plan Limits',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: isDark
-                                    ? const Color(0xFFDFD0B8)
-                                    : const Color(0xFF222831),
-                              ),
-                            ),
-                            Text(
-                              '1 analysis per day • 5 history items',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.blue,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: _showPremiumDialog,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.orange, Colors.deepOrange],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Text(
-                            'Go Premium',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Today',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: const Color(0xFF948979),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            LinearProgressIndicator(
-                              value: _todayAnalysisCount / 1,
-                              backgroundColor: Colors.grey.withOpacity(0.3),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                _todayAnalysisCount >= 1
-                                    ? Colors.red
-                                    : Colors.blue,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$_todayAnalysisCount/1 analyses used',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _todayAnalysisCount >= 1
-                                    ? Colors.red
-                                    : Colors.blue,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'History',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: const Color(0xFF948979),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            LinearProgressIndicator(
-                              value: _analysisHistory.length / 5,
-                              backgroundColor: Colors.grey.withOpacity(0.3),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                _analysisHistory.length >= 5
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${_analysisHistory.length}/5 items saved',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _analysisHistory.length >= 5
-                                    ? Colors.orange
-                                    : Colors.green,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  // Analiz limit kartı
-  Widget _buildAnalysisLimitCard(bool isDark) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.red.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.red,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.block,
-              color: Colors.white,
-              size: 16,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Daily Limit Reached',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.red,
-                  ),
-                ),
-                Text(
-                  'You\'ve used your daily analysis. Upgrade for unlimited access.',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.red.shade700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: _showPremiumDialog,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.orange, Colors.deepOrange],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text(
-                'Upgrade',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
