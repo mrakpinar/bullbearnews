@@ -1,6 +1,7 @@
 import 'package:bullbearnews/models/wallet_model.dart';
 import 'package:bullbearnews/screens/profile/wallet/wallet_detail_screen.dart';
 import 'package:bullbearnews/services/notification_service.dart';
+import 'package:bullbearnews/widgets/shown_profile/shown_profile_stat_item.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -637,7 +638,8 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: [
-                                _buildStatItem('Followers', followers),
+                                ShownProfileStatItem(
+                                    label: 'Followers', count: followers),
                                 Container(
                                   width: 1,
                                   height: 40,
@@ -645,7 +647,10 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
                                       .dividerColor
                                       .withOpacity(0.3),
                                 ),
-                                _buildStatItem('Following', following),
+                                ShownProfileStatItem(
+                                  label: 'Following',
+                                  count: following,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 24),
@@ -725,30 +730,6 @@ class _ShownProfileScreenState extends State<ShownProfileScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildStatItem(String label, int count) {
-    return Column(
-      children: [
-        Text(
-          count.toString(),
-          style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 }

@@ -5,11 +5,14 @@ import 'package:bullbearnews/services/auth_service.dart';
 import 'package:bullbearnews/services/firebase_favorites_service.dart';
 import 'package:bullbearnews/services/firebase_new_saved_service.dart';
 import 'package:bullbearnews/widgets/profile/favorite_cryptos_section.dart';
-import 'package:bullbearnews/widgets/profile/liked_portfolios_section.dart';
+import 'package:bullbearnews/widgets/profile/saved_portfolios_section.dart';
 import 'package:bullbearnews/widgets/profile/portfolio_distribution.dart';
 import 'package:bullbearnews/widgets/profile/portfolio_summary.dart';
+import 'package:bullbearnews/widgets/profile/profile_content_bottom_sheet_widget.dart';
 import 'package:bullbearnews/widgets/profile/profile_drawer.dart';
 import 'package:bullbearnews/widgets/profile/profile_header.dart';
+import 'package:bullbearnews/widgets/profile/profile_header_widget.dart';
+import 'package:bullbearnews/widgets/profile/profile_quick_action_button.dart';
 import 'package:bullbearnews/widgets/profile/saved_news_section.dart';
 import 'package:bullbearnews/widgets/profile/shared_portfolios_section.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -52,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   StreamSubscription<Set<String>>? _favoritesSubscription;
   final FirebaseSavedNewsService _savedNewsService = FirebaseSavedNewsService();
   StreamSubscription<int>? _savedNewsCountSubscription;
+  StreamSubscription<QuerySnapshot>? _savedPortfoliosSubscription;
 
   // Animation controllers
   late AnimationController _headerAnimationController;
@@ -69,6 +73,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   // Saved news sayısını takip etmek için
   int _savedNewsCount = 0;
 
+  // Saved portfolios sayısı
+  int _savedPortfoliosCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -79,6 +86,35 @@ class _ProfileScreenState extends State<ProfileScreen>
     _loadWalletItems();
     _setupFavoritesListener();
     _setupSavedNewsListener();
+    _setupSavedPortfoliosListener();
+  }
+
+  void _setupSavedPortfoliosListener() {
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    _savedPortfoliosSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(currentUserId)
+        .collection('likedPortfolios')
+        .snapshots()
+        .listen(
+      (snapshot) {
+        if (mounted) {
+          setState(() {
+            _savedPortfoliosCount = snapshot.docs.length;
+          });
+        }
+      },
+      onError: (error) {
+        if (mounted) {
+          setState(() {
+            _savedPortfoliosCount = 0;
+            _errorMessage = 'Failed to load saved portfolios count: $error';
+          });
+        }
+      },
+    );
   }
 
   void _setupSavedNewsListener() {
@@ -159,6 +195,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _headerAnimationController.dispose();
     _hideAnimationController.dispose();
     _savedNewsCountSubscription?.cancel();
+    _savedPortfoliosSubscription?.cancel();
     super.dispose();
   }
 
@@ -180,29 +217,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
       },
     );
-  }
-
-  // Remove the old _loadFavoriteCryptosCount method and replace with:
-  Future<void> _updateFavoriteCryptosCount() async {
-    try {
-      final favoriteIds = await _favoritesService.getFavoriteCryptos();
-      if (mounted) {
-        setState(() {
-          _favoriteCryptosCount = favoriteIds.length;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _favoriteCryptosCount = 0;
-        });
-      }
-    }
-  }
-
-  // Update the _onFavoriteCryptosChanged callback:
-  void _onFavoriteCryptosChanged() {
-    _updateFavoriteCryptosCount();
   }
 
   Future<void> _loadMySharedPortfolios() async {
@@ -333,336 +347,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         .replaceAll(RegExp(r'\.$'), '');
   }
 
-  // Build Header Widget (Home screen tarzında)
-  Widget _buildHeader(bool isDark) {
-    return AnimatedBuilder(
-      animation: _headerAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - _headerAnimation.value)),
-          child: Opacity(
-            opacity: _headerAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  // Logo and Title
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF393E46),
-                                    const Color(0xFF948979),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.person_outline,
-                                color: Color(0xFFDFD0B8),
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'My Profile',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: isDark
-                                    ? const Color(0xFFDFD0B8)
-                                    : const Color(0xFF222831),
-                                letterSpacing: -0.5,
-                                fontFamily: 'DMSerif',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Manage your portfolio & preferences',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? const Color(0xFF948979)
-                                : const Color(0xFF393E46),
-                            fontWeight: FontWeight.w500,
-                            fontFamily: 'DMSerif',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Action button (Drawer)
-                  _buildActionButton(
-                    icon: Icons.menu,
-                    onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                    isDark: isDark,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF393E46).withOpacity(0.8)
-            : Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              icon,
-              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF393E46),
-              size: 20,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Modern Quick Action Card Widget
-  Widget _buildQuickActionCard({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onTap,
-    Color? badgeColor,
-    String? badgeText,
-  }) {
-    final theme = Theme.of(context);
-    final isDarkMode = theme.brightness == Brightness.dark;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardTheme.color,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isDarkMode
-                    ? Colors.white.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.2),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: (isDarkMode ? Colors.black : Colors.grey)
-                      .withOpacity(0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 28,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: isDarkMode
-                                    ? Colors.white
-                                    : const Color(0xFF222831),
-                                fontSize: 16,
-                                fontFamily: 'DMSerif',
-                              ),
-                            ),
-                          ),
-                          if (badgeText != null && badgeText != "0")
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: badgeColor ?? iconColor,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                badgeText,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: isDarkMode
-                              ? Colors.white.withOpacity(0.7)
-                              : Colors.grey[600],
-                          fontSize: 14,
-                          fontFamily: 'DMSerif',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: isDarkMode
-                      ? Colors.white.withOpacity(0.4)
-                      : Colors.grey[400],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Show Bottom Sheet for content sections
-  void _showContentBottomSheet({
-    required String title,
-    required Widget content,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) {
-          final theme = Theme.of(context);
-          final isDarkMode = theme.brightness == Brightness.dark;
-
-          return Container(
-            decoration: BoxDecoration(
-              color: isDarkMode
-                  ? const Color(0xFF222831)
-                  : const Color(0xFFDFD0B8),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(28),
-                topRight: Radius.circular(28),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Handle
-                Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 8),
-                  width: 50,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: isDarkMode
-                        ? Colors.white.withOpacity(0.3)
-                        : Colors.black.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                // Close button
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 16, bottom: 8),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isDarkMode
-                            ? Colors.white.withOpacity(0.1)
-                            : Colors.black.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.close,
-                          color: isDarkMode
-                              ? Colors.white.withOpacity(0.7)
-                              : Colors.black.withOpacity(0.7),
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // Content - direkt section'ı göster
-                Expanded(
-                  child: SingleChildScrollView(
-                    controller: scrollController,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: content,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    ).then((_) {
-      // Bottom sheet kapandığında sayıları güncelle
-      _onFavoriteCryptosChanged();
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
@@ -694,7 +378,11 @@ class _ProfileScreenState extends State<ProfileScreen>
                     heightFactor: _hideAnimation.value,
                     child: Transform.translate(
                       offset: Offset(0, -50 * (1 - _hideAnimation.value)),
-                      child: _buildHeader(isDarkMode),
+                      child: ProfileHeaderWidget(
+                        isDark: isDarkMode,
+                        headerAnimation: _headerAnimation,
+                        scaffoldKey: _scaffoldKey,
+                      ),
                     ),
                   ),
                 );
@@ -742,12 +430,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                           const SizedBox(height: 24),
 
                           // Portfolio Distribution Card
-                          _buildQuickActionCard(
+                          ProfileQuickActionButton(
                             title: "Portfolio Analysis",
                             subtitle: "View your investment distribution",
                             icon: Icons.pie_chart_outline,
                             iconColor: const Color(0xFF4CAF50),
-                            onTap: () => _showContentBottomSheet(
+                            onTap: () => ProfileContentBottomSheetWidget.show(
+                              context: context,
                               title: "Portfolio Distribution",
                               icon: Icons.pie_chart_outline,
                               iconColor: const Color(0xFF4CAF50),
@@ -757,7 +446,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
 
                           // Favorite Cryptos Card
-                          _buildQuickActionCard(
+                          ProfileQuickActionButton(
                             title: "Favorite Assets",
                             subtitle: "Manage your watchlist",
                             icon: Icons.favorite_outline,
@@ -766,7 +455,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? _favoriteCryptosCount.toString()
                                 : null,
                             badgeColor: const Color(0xFFFF6B6B),
-                            onTap: () => _showContentBottomSheet(
+                            onTap: () => ProfileContentBottomSheetWidget.show(
+                              context: context,
                               title: "Favorite Cryptocurrencies",
                               icon: Icons.favorite_outline,
                               iconColor: const Color(0xFFFF6B6B),
@@ -775,7 +465,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
 
                           // Saved News Card - Badge ile güncellendi
-                          _buildQuickActionCard(
+                          ProfileQuickActionButton(
                             title: "Saved News",
                             subtitle: "Your bookmarked news",
                             icon: Icons.bookmark_outline,
@@ -784,32 +474,34 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? _savedNewsCount.toString()
                                 : null,
                             badgeColor: const Color(0xFF2196F3),
-                            onTap: () => _showContentBottomSheet(
+                            onTap: () => ProfileContentBottomSheetWidget.show(
+                              context: context,
                               title: "Saved News",
                               icon: Icons.bookmark_outline,
                               iconColor: const Color(0xFF2196F3),
                               content: const SavedNewsSection(),
                             ),
                           ),
-                          // Liked Portfolios
-                          _buildQuickActionCard(
-                            title: "Liked Portfolios",
-                            subtitle: "Liked portfolio insights",
+                          // Saved Portfolios - Badge düzeltildi
+                          ProfileQuickActionButton(
+                            title: "Saved Portfolios",
+                            subtitle: "Saved portfolio insights",
                             icon: Icons.library_add_rounded,
                             iconColor: const Color(0xFFFEA405),
-                            badgeText: _mySharedPortfolios.isNotEmpty
-                                ? _mySharedPortfolios.length.toString()
+                            badgeText: _savedPortfoliosCount > 0
+                                ? _savedPortfoliosCount.toString()
                                 : null,
                             badgeColor: const Color(0xFFFEA405),
-                            onTap: () => _showContentBottomSheet(
-                              title: "Shared Portfolios",
+                            onTap: () => ProfileContentBottomSheetWidget.show(
+                              context: context,
+                              title: "Saved Portfolios",
                               icon: Icons.library_add_outlined,
-                              iconColor: const Color(0xFF6420AA),
-                              content: const LikedPortfoliosSection(),
+                              iconColor: const Color(0xFFFEA405),
+                              content: const SavedPortfoliosSection(),
                             ),
                           ),
                           // Shared Portfolios Card
-                          _buildQuickActionCard(
+                          ProfileQuickActionButton(
                             title: "Shared Portfolios",
                             subtitle: "Community portfolio insights",
                             icon: Icons.share_outlined,
@@ -818,7 +510,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ? _mySharedPortfolios.length.toString()
                                 : null,
                             badgeColor: const Color(0xFF9C27B0),
-                            onTap: () => _showContentBottomSheet(
+                            onTap: () => ProfileContentBottomSheetWidget.show(
+                              context: context,
                               title: "Shared Portfolios",
                               icon: Icons.share_outlined,
                               iconColor: const Color(0xFF9C27B0),

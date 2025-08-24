@@ -1,6 +1,10 @@
 import 'package:bullbearnews/models/video_model.dart';
 import 'package:bullbearnews/services/video_service.dart';
-import 'package:bullbearnews/widgets/video_card.dart';
+import 'package:bullbearnews/widgets/videos/category_filter.dart';
+import 'package:bullbearnews/widgets/videos/empty_videos.dart';
+import 'package:bullbearnews/widgets/videos/header_widget.dart';
+import 'package:bullbearnews/widgets/videos/loading_videos.dart';
+import 'package:bullbearnews/widgets/videos/refresh_indicator_widget.dart';
 import 'package:flutter/material.dart';
 
 class VideosScreen extends StatefulWidget {
@@ -279,7 +283,11 @@ class _VideosScreenState extends State<VideosScreen>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildHeader(isDark),
+                          HeaderWidget(
+                            isDark: isDark,
+                            filteredVideos: _filteredVideos,
+                            headerAnimation: _headerAnimation,
+                          ),
                           _buildCategoryFilter(isDark),
                         ],
                       ),
@@ -297,437 +305,37 @@ class _VideosScreenState extends State<VideosScreen>
     );
   }
 
-  Widget _buildHeader(bool isDark) {
-    return AnimatedBuilder(
-      animation: _headerAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 30 * (1 - _headerAnimation.value)),
-          child: Opacity(
-            opacity: _headerAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF393E46),
-                                    const Color(0xFF948979),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(
-                                Icons.play_circle_fill,
-                                color: Color(0xFFDFD0B8),
-                                size: 18,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Crypto Videos',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.w800,
-                                color: isDark
-                                    ? const Color(0xFFDFD0B8)
-                                    : const Color(0xFF222831),
-                                letterSpacing: -0.5,
-                                fontFamily: 'DMSerif',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Text(
-                              'Educational crypto content 🎥',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: isDark
-                                    ? const Color(0xFF948979)
-                                    : const Color(0xFF393E46),
-                                fontWeight: FontWeight.w500,
-                                fontFamily: 'DMSerif',
-                              ),
-                            ),
-                            if (_filteredVideos.isNotEmpty) ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? const Color(0xFF393E46)
-                                      : const Color(0xFF948979),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${_filteredVideos.length}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Color(0xFFDFD0B8),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildCategoryFilter(bool isDark) {
-    return AnimatedBuilder(
-      animation: _categoryAnimation,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, 20 * (1 - _categoryAnimation.value)),
-          child: Opacity(
-            opacity: _categoryAnimation.value,
-            child: Container(
-              height: 58,
-              margin: const EdgeInsets.only(bottom: 16),
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  final categoryName = category['name']!;
-                  final categoryIcon = category['icon']!;
-                  final isSelected = categoryName == _selectedCategory;
-
-                  int categoryCount = 0;
-                  if (categoryName == 'All') {
-                    categoryCount = _allVideos.length;
-                  } else {
-                    categoryCount = _allVideos
-                        .where((video) =>
-                            video.category.toLowerCase() ==
-                            categoryName.toLowerCase())
-                        .length;
-                  }
-
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.only(right: 12),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _onCategorySelected(categoryName),
-                        borderRadius: BorderRadius.circular(28),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 12),
-                          decoration: BoxDecoration(
-                            gradient: isSelected
-                                ? LinearGradient(
-                                    colors: [
-                                      const Color(0xFF393E46),
-                                      const Color(0xFF948979),
-                                    ],
-                                  )
-                                : null,
-                            color: !isSelected
-                                ? (isDark
-                                    ? const Color(0xFF393E46).withOpacity(0.3)
-                                    : Colors.white.withOpacity(0.7))
-                                : null,
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.transparent
-                                  : (isDark
-                                      ? const Color(0xFF948979).withOpacity(0.3)
-                                      : const Color(0xFF393E46)
-                                          .withOpacity(0.2)),
-                              width: 1,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: const Color(0xFF948979)
-                                          .withOpacity(0.3),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ]
-                                : null,
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                categoryIcon,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                categoryName,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? const Color(0xFFDFD0B8)
-                                      : (isDark
-                                          ? const Color(0xFF948979)
-                                          : const Color(0xFF393E46)),
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  fontSize: 14,
-                                  fontFamily: 'DMSerif',
-                                ),
-                              ),
-                              if (categoryCount > 0) ...[
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? const Color(0xFFDFD0B8)
-                                            .withOpacity(0.2)
-                                        : (isDark
-                                            ? const Color(0xFF948979)
-                                                .withOpacity(0.2)
-                                            : const Color(0xFF393E46)
-                                                .withOpacity(0.1)),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    '$categoryCount',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: isSelected
-                                          ? const Color(0xFFDFD0B8)
-                                          : (isDark
-                                              ? const Color(0xFF948979)
-                                              : const Color(0xFF393E46)),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
+    return CategoryFilter(
+      isDark: isDark,
+      allVideos: _allVideos,
+      categoryAnimation: _categoryAnimation,
+      onCategorySelected: _onCategorySelected,
+      selectedCategory: _selectedCategory,
     );
   }
 
   Widget _buildVideosList(bool isDark) {
     if (_isLoading && _filteredVideos.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF393E46).withOpacity(0.1),
-                    const Color(0xFF948979).withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                ),
-                strokeWidth: 3,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Loading crypto videos...',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '🎥 Educational content loading',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 14,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-          ],
-        ),
+      return LoadingVideos(
+        isDark: isDark,
       );
     }
 
     if (_filteredVideos.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF393E46).withOpacity(0.1),
-                    const Color(0xFF948979).withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.video_library_outlined,
-                size: 64,
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              _selectedCategory == 'All'
-                  ? 'No crypto videos available'
-                  : 'No ${_selectedCategory.toLowerCase()} videos',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _selectedCategory == 'All'
-                  ? '📺 Check back later for new content'
-                  : '🔄 Try selecting a different category',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDark
-                    ? const Color(0xFF948979).withOpacity(0.7)
-                    : const Color(0xFF393E46).withOpacity(0.7),
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _loadVideos(refresh: true),
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFF393E46),
-                        const Color(0xFF948979),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.refresh_rounded,
-                        color: const Color(0xFFDFD0B8),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Refresh Videos',
-                        style: TextStyle(
-                          color: const Color(0xFFDFD0B8),
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'DMSerif',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+      return EmptyVideos(
+        isDark: isDark,
+        selectedCategory: _selectedCategory,
+        onRefresh: () => _loadVideos(refresh: true),
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => _loadVideos(refresh: true),
-      color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-      backgroundColor:
-          isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
-      strokeWidth: 3,
-      displacement: 40,
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        itemCount: _filteredVideos.length + (_isLoadingMore ? 1 : 0),
-        itemBuilder: (context, index) {
-          // Loading indicator at the end
-          if (index == _filteredVideos.length) {
-            return _isLoadingMore
-                ? Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          isDark
-                              ? const Color(0xFF948979)
-                              : const Color(0xFF393E46),
-                        ),
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink();
-          }
-
-          return AnimatedContainer(
-            duration: Duration(milliseconds: 300 + (index * 100)),
-            curve: Curves.easeOut,
-            child: VideoCard(
-              video: _filteredVideos[index],
-              key: ValueKey(_filteredVideos[index].videoID),
-            ),
-          );
-        },
-      ),
+    return RefreshIndicatorWidget(
+      isDark: isDark,
+      loadVideos: () => _loadVideos(refresh: true),
+      scrollController: _scrollController,
+      filteredVideos: _filteredVideos,
+      isLoadingMore: _isLoadingMore,
     );
   }
 }

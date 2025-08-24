@@ -2,21 +2,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/chat_room_model.dart';
 import '../models/chat_message_model.dart';
+import 'notification_service.dart'; // NotificationService'i import et
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final NotificationService _notificationService =
+      NotificationService(); // NotificationService instance
 
   User? getCurrentUser() {
     return _auth.currentUser;
   }
 
-  // Yeni eklenen metod: Mesajın geçerli kullanıcıya ait olup olmadığını kontrol eder
   bool isCurrentUser(String userId) {
     return _auth.currentUser?.uid == userId;
   }
 
-  // Tüm sohbet odalarını getir
   Stream<List<ChatRoom>> getChatRooms() {
     return _firestore
         .collection('chatRooms')
@@ -27,7 +28,6 @@ class ChatService {
     });
   }
 
-  // Belirli bir odadaki mesajları getir
   Stream<List<ChatMessage>> getChatMessages(String roomId) {
     return _firestore
         .collection('chatRooms')
@@ -42,7 +42,147 @@ class ChatService {
     });
   }
 
-  // Mesaj gönder (Reply desteği ile)
+  // Mesajdaki mention'ları parse et
+  Future<Map<String, dynamic>> _parseMentions(
+      String content, String roomId) async {
+    final mentionRegex = RegExp(r'@(\w+)');
+    final matches = mentionRegex.allMatches(content);
+
+    List<String> mentionedUserIds = [];
+    Map<String, String> mentionedUsers = {};
+
+    if (matches.isNotEmpty) {
+      try {
+        // Room'daki kullanıcıları al
+        final roomDoc =
+            await _firestore.collection('chatRooms').doc(roomId).get();
+
+        if (!roomDoc.exists) {
+          print('Debug - Room not found: $roomId');
+          return {
+            'mentionedUserIds': mentionedUserIds,
+            'mentionedUsers': mentionedUsers,
+          };
+        }
+
+        final roomData = roomDoc.data();
+        final userIds = List<String>.from(roomData?['users'] ?? []);
+
+        print('Debug - Room users: $userIds');
+
+        // Tüm kullanıcı bilgilerini toplu olarak çek
+        final userDocs = await Future.wait(
+          userIds.map(
+              (userId) => _firestore.collection('users').doc(userId).get()),
+        );
+
+        // Kullanıcı bilgilerini map'e çevir
+        final userDataMap = <String, Map<String, dynamic>>{};
+        for (int i = 0; i < userIds.length; i++) {
+          if (userDocs[i].exists) {
+            userDataMap[userIds[i]] =
+                userDocs[i].data() as Map<String, dynamic>;
+          }
+        }
+
+        print('Debug - User data map: $userDataMap');
+
+        // Her mention için kullanıcı bilgilerini kontrol et
+        for (final match in matches) {
+          final username = match.group(1)!;
+          print('Debug - Processing mention: @$username');
+
+          // Username'e göre kullanıcıyı bul
+          for (final entry in userDataMap.entries) {
+            final userId = entry.key;
+            final userData = entry.value;
+            final userNickname = (userData['nickname'] ?? '').toString();
+
+            print('Debug - Checking user: $userId, nickname: $userNickname');
+
+            if (userNickname.toLowerCase() == username.toLowerCase()) {
+              if (!mentionedUserIds.contains(userId)) {
+                mentionedUserIds.add(userId);
+                mentionedUsers[userId] = userNickname;
+                print('Debug - Added mention: $userId -> $userNickname');
+              }
+              break;
+            }
+          }
+        }
+
+        print('Debug - Final mentioned users: $mentionedUsers');
+        print('Debug - Final mentioned user IDs: $mentionedUserIds');
+      } catch (e) {
+        print('Debug - Error parsing mentions: $e');
+      }
+    }
+
+    return {
+      'mentionedUserIds': mentionedUserIds,
+      'mentionedUsers': mentionedUsers,
+    };
+  }
+
+  Future<ChatRoom?> getChatRoom(String roomId) async {
+    try {
+      final roomDoc =
+          await _firestore.collection('chatRooms').doc(roomId).get();
+
+      if (!roomDoc.exists) {
+        return null;
+      }
+
+      return ChatRoom.fromFirestore(roomDoc);
+    } catch (e) {
+      print('Error getting chat room: $e');
+      return null;
+    }
+  }
+
+  // YENİ: Mention bildirimi gönder
+  Future<void> _sendMentionNotifications(
+    List<String> mentionedUserIds,
+    String roomId,
+    String messageContent,
+    String senderUsername,
+    String messageId,
+  ) async {
+    if (mentionedUserIds.isEmpty) return;
+
+    try {
+      // Room bilgilerini al
+      final roomDoc =
+          await _firestore.collection('chatRooms').doc(roomId).get();
+      if (!roomDoc.exists) return;
+
+      final roomData = roomDoc.data()!;
+      final roomName = roomData['name'] ?? 'Chat Room';
+
+      print(
+          '🔔 Sending mention notifications to ${mentionedUserIds.length} users in room: $roomName');
+
+      // Her mention edilen kullanıcıya bildirim gönder
+      for (final userId in mentionedUserIds) {
+        print('📤 Sending mention notification to: $userId');
+
+        await _notificationService.sendChatMentionNotification(
+          mentionedUserId: userId,
+          roomId: roomId,
+          roomName: roomName,
+          messageContent: messageContent,
+          messageId: messageId,
+        );
+
+        print('✅ Mention notification sent to: $userId');
+      }
+
+      print('🎉 All mention notifications sent successfully');
+    } catch (e) {
+      print('❌ Error sending mention notifications: $e');
+    }
+  }
+
   Future<void> sendMessage(
     String roomId,
     String content, {
@@ -69,6 +209,11 @@ class ChatService {
     final nickname = userDoc.data()?['nickname'] ?? 'Anonim Kullanıcı';
     final profileImageUrl = userDoc.data()?['profileImageUrl'];
 
+    // Mention'ları parse et
+    final mentionData = await _parseMentions(content, roomId);
+    final mentionedUserIds = mentionData['mentionedUserIds'] as List<String>;
+    final mentionedUsers = mentionData['mentionedUsers'] as Map<String, String>;
+
     Map<String, dynamic> messageData = {
       'roomId': roomId,
       'userId': user.uid,
@@ -77,6 +222,8 @@ class ChatService {
       'content': content,
       'timestamp': FieldValue.serverTimestamp(),
       'likes': 0,
+      'mentionedUserIds': mentionedUserIds,
+      'mentionedUsers': mentionedUsers,
     };
 
     // Reply bilgilerini ekle
@@ -88,14 +235,25 @@ class ChatService {
       });
     }
 
-    await _firestore
+    // Mesajı Firestore'a kaydet
+    final messageRef = await _firestore
         .collection('chatRooms')
         .doc(roomId)
         .collection('messages')
         .add(messageData);
+
+    // Mention bildirimlerini gönder
+    if (mentionedUserIds.isNotEmpty) {
+      await _sendMentionNotifications(
+        mentionedUserIds,
+        roomId,
+        content,
+        nickname,
+        messageRef.id, // Mesajın ID'sini geç
+      );
+    }
   }
 
-  // Mesaja beğeni ekle
   Future<void> likeMessage(ChatMessage message) async {
     if (_auth.currentUser == null) return;
 
@@ -109,7 +267,6 @@ class ChatService {
     });
   }
 
-  // kullanıcıyı sohbet odasına ekle
   Future<void> joinRoom(String roomId) async {
     if (_auth.currentUser == null) return;
 
@@ -122,7 +279,7 @@ class ChatService {
         List<String>.from(roomData?['bannedUsers'] ?? []);
 
     if (bannedUsers.contains(user.uid)) {
-      throw Exception('Bu odaya katılamazsınız, yasaklısınız.');
+      throw Exception('You cannot join this room, You are banned!!.');
     }
 
     await _firestore.collection('chatRooms').doc(roomId).update({
@@ -131,7 +288,6 @@ class ChatService {
     });
   }
 
-  // Kullanıcıyı sohbet odasından çıkar
   Future<void> leaveRoom(String roomId) async {
     if (_auth.currentUser == null) return;
 
@@ -143,9 +299,7 @@ class ChatService {
     });
   }
 
-  // ADMIN MESAJ YÖNETİMİ METOTLARİ
-
-  // Tüm mesajları getir (Admin için)
+  // Admin metodları...
   Future<List<Map<String, dynamic>>> getAllMessages({int? limit}) async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -153,13 +307,11 @@ class ChatService {
 
     List<Map<String, dynamic>> allMessages = [];
 
-    // Tüm chat room'ları al
     final roomsSnapshot = await _firestore.collection('chatRooms').get();
 
     for (var roomDoc in roomsSnapshot.docs) {
       final roomData = roomDoc.data();
 
-      // Her room için mesajları al
       Query messagesQuery = _firestore
           .collection('chatRooms')
           .doc(roomDoc.id)
@@ -167,8 +319,7 @@ class ChatService {
           .orderBy('timestamp', descending: true);
 
       if (limit != null) {
-        messagesQuery =
-            messagesQuery.limit(100); // Her room'dan maksimum 100 mesaj
+        messagesQuery = messagesQuery.limit(100);
       }
 
       final messagesSnapshot = await messagesQuery.get();
@@ -184,7 +335,6 @@ class ChatService {
       }
     }
 
-    // Tüm mesajları timestamp'e göre sırala
     allMessages.sort((a, b) {
       final aTimestamp = a['timestamp'] as Timestamp?;
       final bTimestamp = b['timestamp'] as Timestamp?;
@@ -201,7 +351,6 @@ class ChatService {
     return allMessages;
   }
 
-  // Belirli bir mesajı sil (Admin için)
   Future<void> deleteMessage(String roomId, String messageId) async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -215,7 +364,6 @@ class ChatService {
         .delete();
   }
 
-  // Kullanıcıyı odadan yasakla (Admin için)
   Future<void> banUserFromRoom(String userId, String roomId) async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -237,12 +385,10 @@ class ChatService {
       final List<String> activeUsers =
           List<String>.from(roomData['activeUsers'] ?? []);
 
-      // Kullanıcıyı banned listesine ekle
       if (!bannedUsers.contains(userId)) {
         bannedUsers.add(userId);
       }
 
-      // Kullanıcıyı aktif listelerden çıkar
       users.remove(userId);
       activeUsers.remove(userId);
 
@@ -254,7 +400,6 @@ class ChatService {
     });
   }
 
-  // Kullanıcının yasağını kaldır (Admin için)
   Future<void> unbanUserFromRoom(String userId, String roomId) async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -265,7 +410,6 @@ class ChatService {
     });
   }
 
-  // Yasaklı kullanıcıları getir (Admin için)
   Future<List<Map<String, dynamic>>> getBannedUsers() async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -285,8 +429,7 @@ class ChatService {
           'userId': userId,
           'roomId': roomDoc.id,
           'roomName': roomData['name'] ?? 'Unknown Room',
-          'bannedAt':
-              DateTime.now(), // Gerçek ban tarihi için ayrı alan eklenebilir
+          'bannedAt': DateTime.now(),
         });
       }
     }
@@ -294,7 +437,6 @@ class ChatService {
     return bannedUsersList;
   }
 
-  // Odadaki tüm mesajları temizle (Admin için)
   Future<void> clearRoomMessages(String roomId) async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -306,7 +448,6 @@ class ChatService {
         .collection('messages')
         .get();
 
-    // Batch ile tüm mesajları sil
     WriteBatch batch = _firestore.batch();
 
     for (var doc in messagesSnapshot.docs) {
@@ -316,7 +457,6 @@ class ChatService {
     await batch.commit();
   }
 
-  // Kullanıcının belirli bir odadaki mesajlarını getir
   Stream<List<ChatMessage>> getUserMessagesInRoom(
       String roomId, String userId) {
     return _firestore
@@ -333,7 +473,6 @@ class ChatService {
     });
   }
 
-  // Mesaj istatistikleri getir (Admin için)
   Future<Map<String, dynamic>> getMessageStats() async {
     if (_auth.currentUser == null) {
       throw Exception('Yetkisiz erişim');
@@ -392,7 +531,6 @@ class ChatService {
     });
   }
 
-  // Belirli tarih aralığındaki mesajları getir
   Future<List<Map<String, dynamic>>> getMessagesByDateRange(
       DateTime startDate, DateTime endDate,
       {String? roomId}) async {
@@ -403,7 +541,6 @@ class ChatService {
     List<Map<String, dynamic>> messages = [];
 
     if (roomId != null) {
-      // Belirli bir room için
       final messagesSnapshot = await _firestore
           .collection('chatRooms')
           .doc(roomId)
@@ -428,7 +565,6 @@ class ChatService {
         });
       }
     } else {
-      // Tüm room'lar için
       final roomsSnapshot = await _firestore.collection('chatRooms').get();
 
       for (var roomDoc in roomsSnapshot.docs) {
@@ -455,7 +591,6 @@ class ChatService {
         }
       }
 
-      // Tüm mesajları timestamp'e göre sırala
       messages.sort((a, b) {
         final aTimestamp = a['timestamp'] as Timestamp?;
         final bTimestamp = b['timestamp'] as Timestamp?;
@@ -469,7 +604,6 @@ class ChatService {
     return messages;
   }
 
-  // Kullanıcının odadan yasaklı olup olmadığını kontrol et
   Future<bool> isUserBannedFromRoom(String userId, String roomId) async {
     final roomDoc = await _firestore.collection('chatRooms').doc(roomId).get();
 
@@ -482,7 +616,6 @@ class ChatService {
     return bannedUsers.contains(userId);
   }
 
-  // Toplu mesaj silme (Admin için)
   Future<void> deleteBulkMessages(
       List<Map<String, String>> messageReferences) async {
     if (_auth.currentUser == null) {

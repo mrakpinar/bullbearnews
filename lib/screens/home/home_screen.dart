@@ -1,7 +1,8 @@
-import 'package:bullbearnews/screens/home/chat_screen.dart';
 import 'package:bullbearnews/screens/home/notification_screen.dart';
 import 'package:bullbearnews/screens/home/search_user_screen.dart';
 import 'package:bullbearnews/services/notification_service.dart';
+import 'package:bullbearnews/widgets/home/action_button.dart';
+import 'package:bullbearnews/widgets/home/is_loading.dart';
 import 'package:bullbearnews/widgets/news_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -330,7 +331,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   // Action buttons
                   Row(
                     children: [
-                      _buildActionButton(
+                      ActionButton(
                         icon: Icons.search_rounded,
                         onTap: () => Navigator.push(
                           context,
@@ -342,14 +343,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       const SizedBox(width: 8),
                       _buildNotificationButton(isDark),
                       const SizedBox(width: 8),
-                      _buildMessageButton(
-                        icon: Icons.message_outlined,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => ChatScreen()),
-                        ),
-                        isDark: isDark,
-                      ),
                     ],
                   ),
                 ],
@@ -358,42 +351,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildMessageButton(
-      {required IconData icon,
-      required VoidCallback onTap,
-      required bool isDark}) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF393E46).withOpacity(0.8)
-            : Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              icon,
-              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF393E46),
-              size: 20,
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -471,43 +428,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ],
         );
       },
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required VoidCallback onTap,
-    required bool isDark,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark
-            ? const Color(0xFF393E46).withOpacity(0.8)
-            : Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(
-              icon,
-              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF393E46),
-              size: 20,
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -613,52 +533,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   Widget _buildNewsList(bool isDark) {
     if (_isLoading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF393E46).withOpacity(0.1),
-                    const Color(0xFF948979).withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                ),
-                strokeWidth: 3,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Loading crypto news...',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '📈 Stay ahead of the market',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 14,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-          ],
-        ),
-      );
+      IsLoading(isDark: isDark);
     }
 
     if (_allNews.isEmpty) {

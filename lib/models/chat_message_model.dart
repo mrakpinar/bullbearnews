@@ -9,9 +9,11 @@ class ChatMessage {
   final String content;
   final DateTime timestamp;
   final int likes;
-  final String? replyToMessageId; // Yanıtlanan mesaj ID'si
-  final String? replyToContent; // Yanıtlanan mesaj içeriği
-  final String? replyToUsername; // Yanıtlanan mesajın kullanıcı adı
+  final String? replyToMessageId;
+  final String? replyToContent;
+  final String? replyToUsername;
+  final List<String> mentionedUserIds; // Etiketlenen kullanıcı ID'leri
+  final Map<String, String> mentionedUsers; // userId -> username mapping
 
   ChatMessage({
     required this.id,
@@ -25,6 +27,8 @@ class ChatMessage {
     this.replyToMessageId,
     this.replyToContent,
     this.replyToUsername,
+    this.mentionedUserIds = const [],
+    this.mentionedUsers = const {},
   });
 
   factory ChatMessage.fromFirestore(DocumentSnapshot doc) {
@@ -41,6 +45,8 @@ class ChatMessage {
       replyToMessageId: data['replyToMessageId'],
       replyToContent: data['replyToContent'],
       replyToUsername: data['replyToUsername'],
+      mentionedUserIds: List<String>.from(data['mentionedUserIds'] ?? []),
+      mentionedUsers: Map<String, String>.from(data['mentionedUsers'] ?? {}),
     );
   }
 
@@ -56,8 +62,11 @@ class ChatMessage {
       'replyToMessageId': replyToMessageId,
       'replyToContent': replyToContent,
       'replyToUsername': replyToUsername,
+      'mentionedUserIds': mentionedUserIds,
+      'mentionedUsers': mentionedUsers,
     };
   }
 
   bool get hasReply => replyToMessageId != null && replyToContent != null;
+  bool get hasMentions => mentionedUserIds.isNotEmpty;
 }

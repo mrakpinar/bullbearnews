@@ -1,613 +1,765 @@
-import 'package:bullbearnews/widgets/community/chat/banned_prompt.dart';
+import 'dart:async';
+import 'dart:ui';
+import 'package:bullbearnews/widgets/community/chat/chat_room_banned_prompt.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_info_dialog.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_join_prompt.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_leave_confirm_dialog.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_report_dialog.dart';
 import 'package:bullbearnews/widgets/community/chat/empty_message_states.dart';
-import 'package:bullbearnews/widgets/community/chat/join_prompt.dart';
-import 'package:bullbearnews/widgets/community/chat/message_card.dart';
-import 'package:bullbearnews/widgets/community/chat/message_input.dart';
 import 'package:bullbearnews/widgets/community/chat/reply_preview.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:bullbearnews/widgets/community/chat/swipe_to_reply_wrapper.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
 import '../../models/chat_message_model.dart';
 import '../../services/chat_service.dart';
+import '../../widgets/community/chat/message_card.dart';
+import '../../widgets/community/chat/message_input.dart';
 
 class ChatScreen extends StatefulWidget {
   final ChatRoom chatRoom;
+  final String? highlightMessageId; // YENİ: Highlight edilecek mesaj ID'si
 
-  const ChatScreen({super.key, required this.chatRoom});
+  const ChatScreen({
+    super.key,
+    required this.chatRoom,
+    this.highlightMessageId,
+  });
 
   @override
-  _ChatScreenState createState() => _ChatScreenState();
+  State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
-  final TextEditingController _messageController = TextEditingController();
+class _ChatScreenState extends State<ChatScreen>
+    with SingleTickerProviderStateMixin {
   final ChatService _chatService = ChatService();
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _messageController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+
+  String? _highlightedMessageId;
+  Timer? _highlightTimer;
   bool _hasJoinedRoom = false;
   bool _isUserBanned = false;
-  bool _isDescriptionExpanded = false;
-  late AnimationController _animationController;
-  late Animation<double> _expandAnimation;
-  late final Stream<List<ChatMessage>> _messagesStream;
-
-  // Reply functionality
+  bool _isLoading = true;
   ChatMessage? _replyToMessage;
-  final FocusNode _textFieldFocus = FocusNode();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _checkIfUserJoinedRoom();
-    _checkIfUserBanned();
-    _initializeAnimations();
-    // Stream'i cache'le
-    _messagesStream = _chatService.getChatMessages(widget.chatRoom.id);
-  }
 
-  void _initializeAnimations() {
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    _expandAnimation = CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.easeInOut,
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
+    _animationController.forward();
+
+    _checkUserStatus();
+
+    // Highlight edilecek mesaj varsa
+    if (widget.highlightMessageId != null) {
+      _highlightedMessageId = widget.highlightMessageId;
+
+      // 2 saniye sonra scroll et ve highlight et
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted) {
+          // 5 saniye sonra highlight'ı kaldır
+          _highlightTimer = Timer(const Duration(seconds: 5), () {
+            if (mounted) {
+              setState(() {
+                _highlightedMessageId = null;
+              });
+            }
+          });
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
-    _messageController.dispose();
     _scrollController.dispose();
+    _messageController.dispose();
+    _focusNode.dispose();
+    _highlightTimer?.cancel();
     _animationController.dispose();
-    _textFieldFocus.dispose();
     super.dispose();
   }
 
-  Future<void> _checkIfUserJoinedRoom() async {
+  Future<void> _checkUserStatus() async {
     final currentUser = _chatService.getCurrentUser();
-    if (currentUser == null) return;
-
-    try {
-      final roomDoc = await FirebaseFirestore.instance
-          .collection('chatRooms')
-          .doc(widget.chatRoom.id)
-          .get();
-
-      if (roomDoc.exists && mounted) {
-        final users = List<String>.from(roomDoc['users'] ?? []);
-        if (mounted) {
-          setState(() => _hasJoinedRoom = users.contains(currentUser.uid));
-        }
+    if (currentUser == null) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasJoinedRoom = false;
+        });
       }
-    } catch (e) {
-      // Handle error silently
-      debugPrint('Error checking if user joined room: $e');
+      return;
     }
-  }
-
-  Future<void> _checkIfUserBanned() async {
-    final currentUser = _chatService.getCurrentUser();
-    if (currentUser == null) return;
 
     try {
       final isBanned = await _chatService.isUserBannedFromRoom(
-          currentUser.uid, widget.chatRoom.id);
+        currentUser.uid,
+        widget.chatRoom.id,
+      );
+
+      // ChatService'ten güncel room bilgisini al
+      final updatedRoom = await _chatService.getChatRoom(widget.chatRoom.id);
+      final hasJoined = updatedRoom?.users.contains(currentUser.uid) ?? false;
 
       if (mounted) {
-        setState(() => _isUserBanned = isBanned);
+        setState(() {
+          _isUserBanned = isBanned;
+          _hasJoinedRoom = hasJoined;
+          _isLoading = false;
+        });
       }
     } catch (e) {
-      debugPrint('Error checking if user is banned: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      debugPrint('Error checking user status: $e');
     }
   }
 
-  void _toggleDescription() {
+  void _scrollToHighlightedMessage(List<ChatMessage> messages) {
+    if (_highlightedMessageId == null) return;
+
+    // Mesajı listede bul
+    final messageIndex = messages.indexWhere(
+      (msg) => msg.id == _highlightedMessageId,
+    );
+
+    if (messageIndex != -1) {
+      // ListView reverse=true olduğu için index'i tersine çevir
+      final scrollIndex = messages.length - 1 - messageIndex;
+
+      // Mesaja scroll et (her mesaj için ortalama yükseklik)
+      const itemHeight = 120.0; // Tahmini mesaj yüksekliği
+      final scrollOffset = scrollIndex * itemHeight;
+
+      _scrollController.animateTo(
+        scrollOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 1200),
+        curve: Curves.easeInOutCubic,
+      );
+    }
+  }
+
+  Future<void> _sendMessage() async {
+    if (_messageController.text.trim().isEmpty) return;
+    if (_isUserBanned) return;
+    if (!_hasJoinedRoom) {
+      _showJoinRoomDialog();
+      return;
+    }
+
+    final content = _messageController.text.trim();
+    _messageController.clear();
+
+    try {
+      await _chatService.sendMessage(
+        widget.chatRoom.id,
+        content,
+        replyToMessage: _replyToMessage,
+      );
+
+      // Reply'i temizle
+      if (_replyToMessage != null) {
+        setState(() {
+          _replyToMessage = null;
+        });
+      }
+
+      // Mesaj gönderildikten sonra aşağı scroll
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (_scrollController.hasClients) {
+          _scrollController.animateTo(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending message: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleReply(ChatMessage message) {
     setState(() {
-      _isDescriptionExpanded = !_isDescriptionExpanded;
+      _replyToMessage = message;
     });
-    if (_isDescriptionExpanded) {
-      _animationController.forward();
-    } else {
-      _animationController.reverse();
-    }
+    _focusNode.requestFocus();
   }
 
-  // Cancel reply
   void _cancelReply() {
     setState(() {
       _replyToMessage = null;
     });
   }
 
-  void _sendMessage() {
-    final text = _messageController.text.trim();
-    if (text.isEmpty || !_hasJoinedRoom || _isUserBanned) return;
-
-    _chatService.sendMessage(
-      widget.chatRoom.id,
-      text,
-      replyToMessage: _replyToMessage,
-    );
-
-    _messageController.clear();
-    _cancelReply(); // Reply'i temizle
-
-    // Auto scroll to bottom
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   Future<void> _joinRoom() async {
-    // Ban kontrolü
-    if (_isUserBanned) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bu odaya katılamazsınız, yasaklısınız.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
     try {
       await _chatService.joinRoom(widget.chatRoom.id);
+
       if (mounted) {
-        setState(() => _hasJoinedRoom = true);
+        setState(() {
+          _hasJoinedRoom = true; // UI'ı hemen güncelle
+        });
+      }
+
+      // Status kontrolü yapmayın, çünkü UI zaten güncellenmiş
+      // await _checkUserStatus(); // Bu satırı kaldırın veya yorum yapın
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error joining room: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _leaveRoom() async {
+    try {
+      await _chatService.leaveRoom(widget.chatRoom.id);
+      if (mounted) {
+        Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error joining room: $e')),
+          SnackBar(
+            content: Text('Error leaving room: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
         );
       }
     }
   }
 
-  void _leaveRoom() {
-    _chatService.leaveRoom(widget.chatRoom.id);
-    Navigator.of(context).pop();
-  }
-
-  // Raporlama dialog'u
-  Future<void> _showReportDialog(ChatMessage message) async {
-    final currentUser = _chatService.getCurrentUser();
-    if (currentUser == null) return;
-
-    // Kendi mesajını raporlayamaz
-    if (message.userId == currentUser.uid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('You cannot report your own message.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    String? selectedReason;
-    final reasons = [
-      'Spam',
-      'Insult/Profanity',
-      'Inappropriate Content',
-      'Fraud',
-      'Hate Speech',
-      'Other',
-    ];
-
-    return showDialog<void>(
+  void _showJoinRoomDialog() {
+    showDialog(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: Text(
-                'Report Message',
-                style: TextStyle(
-                  fontFamily: 'DMSerif',
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.onSurface,
-                ),
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark
+            ? const Color(0xFF393E46)
+            : Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: Text(
+          'Join Room',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFFDFD0B8)
+                : const Color(0xFF222831),
+            fontFamily: 'DMSerif',
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: Text(
+          'You need to join "${widget.chatRoom.name}" to send messages.',
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF948979)
+                : const Color(0xFF393E46),
+            fontFamily: 'DMSerif',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontFamily: 'DMSerif',
               ),
-              backgroundColor: Theme.of(context).cardTheme.color,
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'User: ${message.username}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200]?.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      message.content,
-                      style: TextStyle(
-                        fontStyle: FontStyle.italic,
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Reason for reporting:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      decoration: TextDecoration.underline,
-                      decorationStyle: TextDecorationStyle.solid,
-                      decorationColor: Theme.of(context).colorScheme.secondary,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...reasons.map((reason) => RadioListTile<String>(
-                        title: Text(
-                          reason,
-                          style: TextStyle(
-                            fontFamily: 'DMSerif',
-                            color: Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
-                        value: reason,
-                        groupValue: selectedReason,
-                        fillColor: MaterialStateProperty.all(
-                          Theme.of(context).colorScheme.secondary,
-                        ),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedReason = value;
-                          });
-                        },
-                        dense: true,
-                      )),
-                ],
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _joinRoom();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              actions: [
-                ElevatedButton(
-                  style: ButtonStyle(
-                      backgroundColor: WidgetStateProperty.all(
-                          Colors.grey[400]?.withOpacity(0.4))),
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                  },
-                  child: Text(
-                    'Cancel',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: selectedReason != null
-                      ? () async {
-                          try {
-                            await _chatService.reportMessage(
-                              roomId: widget.chatRoom.id,
-                              messageId: message.id,
-                              messageContent: message.content,
-                              messageUserId: message.userId,
-                              messageUserName: message.username,
-                              reason: selectedReason!,
-                            );
-
-                            if (mounted) {
-                              Navigator.of(context).pop();
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content:
-                                      Text('Message reported successfully.'),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                            }
-                          } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                            }
-                          }
-                        }
-                      : null,
-                  child: Text(
-                    'Report',
-                    style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurface),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return Scaffold(
-      appBar: _buildAppBar(theme),
-      body: Column(
-        children: [
-          _buildCollapsibleDescription(theme),
-          Expanded(child: _buildMessagesStream(theme, colorScheme)),
-          if (_replyToMessage != null)
-            ReplyPreview(
-              message: _replyToMessage!,
-              onCancel: _cancelReply,
-              theme: theme,
             ),
-          if (_isUserBanned)
-            BannedPrompt(theme: theme)
-          else if (!_hasJoinedRoom)
-            JoinPrompt(onJoin: _joinRoom, theme: theme)
-          else
-            MessageInput(
-              controller: _messageController,
-              focusNode: _textFieldFocus,
-              onSend: _sendMessage,
-              theme: theme,
-              colorScheme: colorScheme,
+            child: const Text(
+              'Join',
+              style: TextStyle(
+                fontFamily: 'DMSerif',
+                fontWeight: FontWeight.w600,
+              ),
             ),
+          ),
         ],
       ),
     );
   }
 
-  PreferredSizeWidget _buildAppBar(ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
+  void _showReportDialog(ChatMessage message) {
+    showDialog(
+      context: context,
+      builder: (context) => ChatRoomReportDialog(
+        message: message,
+        onReport: (reason) async {
+          try {
+            await _chatService.reportMessage(
+              roomId: widget.chatRoom.id,
+              messageId: message.id,
+              messageContent: message.content,
+              messageUserId: message.userId,
+              messageUserName: message.username,
+              reason: reason,
+            );
 
-    return AppBar(
-      title: GestureDetector(
-        onTap: _toggleDescription,
-        child: Row(
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Message reported successfully'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Error reporting message: $e'),
+                  backgroundColor: Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Loading chat...',
+                style: TextStyle(
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
+                  fontFamily: 'DMSerif',
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Banned user ekranı
+    if (_isUserBanned) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          leading: Container(
+            margin: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF393E46).withOpacity(0.8)
+                  : Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                size: 20,
+                color:
+                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          title: Text(
+            widget.chatRoom.name,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+              fontFamily: 'DMSerif',
+            ),
+          ),
+        ),
+        body: ChatRoomBannedPrompt(theme: Theme.of(context)),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        leading: Container(
+          margin: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF393E46).withOpacity(0.8)
+                : Colors.white.withOpacity(0.8),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IconButton(
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              size: 20,
+              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               widget.chatRoom.name,
               style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
                 color:
                     isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
                 fontFamily: 'DMSerif',
               ),
             ),
-            const SizedBox(
-              width: 8,
+            Text(
+              '${widget.chatRoom.users.length} members',
+              style: TextStyle(
+                fontSize: 12,
+                color:
+                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
+                fontFamily: 'DMSerif',
+              ),
             ),
-            if (_isUserBanned)
-              Icon(
-                Icons.block,
-                color: Colors.red,
-                size: 24,
-              )
-            else if (_isDescriptionExpanded)
-              const Icon(Icons.keyboard_arrow_up_rounded, size: 28)
-            else
-              const Icon(Icons.keyboard_arrow_down_rounded, size: 28),
           ],
         ),
-      ),
-      leading: IconButton(
-        onPressed: () {
-          Navigator.pop(context);
-        },
-        icon: Icon(
-          Icons.arrow_back_ios_new_sharp,
-        ),
-      ),
-      backgroundColor:
-          isDark ? const Color(0xFF393E46) : const Color(0xFF948979),
-      iconTheme: IconThemeData(
-        color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-      ),
-      elevation: 0,
-      actions: [
-        if (!_isUserBanned) // Banned kullanıcılar odadan çıkamaz
-          IconButton(
-            onPressed: _leaveRoom,
-            icon: Icon(
-              Icons.exit_to_app_sharp,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? const Color(0xFF393E46).withOpacity(0.8)
+                  : Colors.white.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(12),
             ),
-          )
-      ],
-    );
-  }
-
-  Widget _buildCollapsibleDescription(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? Colors.grey[850]
-            : Colors.grey[100],
-        border: Border(
-          bottom: BorderSide(
-            color: theme.brightness == Brightness.dark
-                ? Colors.grey[800]!
-                : Colors.grey[300]!,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.only(top: 15.0),
-        child: SizeTransition(
-          sizeFactor: _expandAnimation,
-          child: Container(
-            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-            width: double.infinity,
-            child: _DescriptionCard(
-              chatRoom: widget.chatRoom,
-              theme: theme,
-              isUserBanned: _isUserBanned,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessagesStream(ThemeData theme, ColorScheme colorScheme) {
-    return StreamBuilder<List<ChatMessage>>(
-      stream: _messagesStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Center(
-            child: CircularProgressIndicator(color: colorScheme.primary),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return EmptyMessagesState(theme: theme, colorScheme: colorScheme);
-        }
-
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.all(12),
-          reverse: true,
-          itemCount: snapshot.data!.length,
-          addAutomaticKeepAlives: false,
-          addRepaintBoundaries: true,
-          itemBuilder: (context, index) {
-            final message = snapshot.data![index];
-            return MessageCard(
-              key: ValueKey(message.id),
-              message: message,
-              isCurrentUser: _chatService.isCurrentUser(message.userId),
-              hasJoinedRoom: _hasJoinedRoom && !_isUserBanned,
-              theme: theme,
-              colorScheme: colorScheme,
-              onReport: () => _showReportDialog(message),
-              onReply: (ChatMessage replyMessage) {
-                // Düzeltildi
-                setState(() {
-                  _replyToMessage = replyMessage; // State'i güncelle
-                });
-                _textFieldFocus.requestFocus(); // Text field'e focus ver
-              },
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-// Ayrı widget'lar performans için
-class _DescriptionCard extends StatelessWidget {
-  final ChatRoom chatRoom;
-  final ThemeData theme;
-  final bool isUserBanned;
-
-  const _DescriptionCard({
-    required this.chatRoom,
-    required this.theme,
-    required this.isUserBanned,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? Colors.grey[800]
-            : Colors.grey[50],
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isUserBanned
-              ? Colors.red.withOpacity(0.5)
-              : theme.brightness == Brightness.dark
-                  ? Colors.grey[700]!
-                  : Colors.grey[200]!,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (isUserBanned)
-            Container(
-              padding: const EdgeInsets.all(8),
-              margin: const EdgeInsets.only(bottom: 12),
-              decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(color: Colors.red.withOpacity(0.3)),
+            child: PopupMenuButton<String>(
+              icon: Icon(
+                Icons.more_vert,
+                color:
+                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
               ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.block,
-                    color: Colors.red,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Bu odadan yasaklandınız. Mesaj gönderemez ve odaya katılamazsınız.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.red[700],
-                        fontWeight: FontWeight.w600,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: isDark ? const Color(0xFF393E46) : Colors.white,
+              onSelected: (value) {
+                switch (value) {
+                  case 'leave':
+                    _showLeaveConfirmDialog();
+                    break;
+                  case 'info':
+                    _showRoomInfoDialog();
+                    break;
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'info',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: isDark
+                            ? const Color(0xFFDFD0B8)
+                            : const Color(0xFF222831),
+                        size: 18,
                       ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Room Info',
+                        style: TextStyle(
+                          color: isDark
+                              ? const Color(0xFFDFD0B8)
+                              : const Color(0xFF222831),
+                          fontFamily: 'DMSerif',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_hasJoinedRoom)
+                  PopupMenuItem(
+                    value: 'leave',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.exit_to_app,
+                          color: Colors.red[600],
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Leave Room',
+                          style: TextStyle(
+                            color: Colors.red[600],
+                            fontFamily: 'DMSerif',
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
-          Text(
-            chatRoom.description,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[300]
-                  : Colors.grey[600],
-              height: 1.4,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Total users: ${chatRoom.users.length}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[400]
-                  : Colors.grey[500],
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Created at: ${chatRoom.createdAt.toLocal().toString().substring(0, 16)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[400]
-                  : Colors.grey[500],
-              fontSize: 12,
+              ],
             ),
           ),
         ],
       ),
+      // ChatScreen build metodundaki body kısmını şu şekilde güncelleyin:
+
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            // Reply preview (sadece katılan kullanıcılar için)
+
+            // Messages list
+            Expanded(
+              child: Stack(
+                children: [
+                  // Ana mesaj listesi
+                  StreamBuilder<List<ChatMessage>>(
+                    stream: _chatService.getChatMessages(widget.chatRoom.id),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                                colorScheme.primary),
+                          ),
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                size: 48,
+                                color: Colors.red[400],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Error loading messages',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.red[400],
+                                  fontFamily: 'DMSerif',
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                        return EmptyMessagesState(
+                          theme: Theme.of(context),
+                          colorScheme: colorScheme,
+                        );
+                      }
+
+                      final messages = snapshot.data!;
+
+                      // Highlight edilecek mesajı bul ve scroll et
+                      if (_highlightedMessageId != null && _hasJoinedRoom) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToHighlightedMessage(messages);
+                        });
+                      }
+
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: messages.length,
+                        itemBuilder: (context, index) {
+                          final message = messages[index];
+                          final isHighlighted =
+                              _highlightedMessageId == message.id;
+
+                          return AnimatedContainer(
+                            duration:
+                                Duration(milliseconds: 300 + (index * 50)),
+                            curve: Curves.easeOutBack,
+                            child: SwipeToReplyWrapper(
+                              onReply: _hasJoinedRoom
+                                  ? () => _handleReply(message)
+                                  : null,
+                              child: MessageCard(
+                                message: message,
+                                isCurrentUser:
+                                    _chatService.isCurrentUser(message.userId),
+                                hasJoinedRoom: _hasJoinedRoom,
+                                theme: Theme.of(context),
+                                colorScheme: colorScheme,
+                                isHighlighted: isHighlighted && _hasJoinedRoom,
+                                onReport: () => _showReportDialog(message),
+                                onReply: (msg) => _handleReply(msg),
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+
+                  // Blur overlay for non-members
+                  if (!_hasJoinedRoom)
+                    Positioned.fill(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
+                        child: Container(
+                          color: isDark
+                              ? Colors.black.withOpacity(0.3)
+                              : Colors.white.withOpacity(0.3),
+                          child: Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.visibility_off_outlined,
+                                  size: 48,
+                                  color: isDark
+                                      ? const Color(0xFF948979)
+                                      : Colors.grey[600],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Join the room to see messages',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? const Color(0xFFDFD0B8)
+                                        : const Color(0xFF222831),
+                                    fontFamily: 'DMSerif',
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Messages are hidden until you join',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? const Color(0xFF948979)
+                                        : Colors.grey[600],
+                                    fontFamily: 'DMSerif',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            if (_replyToMessage != null && _hasJoinedRoom)
+              ReplyPreview(
+                message: _replyToMessage!,
+                onCancel: _cancelReply,
+                theme: Theme.of(context),
+              ),
+
+            // Message input veya Join prompt
+            if (_hasJoinedRoom)
+              MessageInput(
+                controller: _messageController,
+                focusNode: _focusNode,
+                onSend: _sendMessage,
+                theme: Theme.of(context),
+                colorScheme: colorScheme,
+                roomId: widget.chatRoom.id,
+              )
+            else
+              ChatRoomJoinPrompt(
+                onJoin: _joinRoom,
+                theme: Theme.of(context),
+              ),
+          ],
+        ),
+      ),
     );
+  }
+
+  void _showLeaveConfirmDialog() {
+    showDialog(
+        context: context,
+        builder: (context) => ChatRoomLeaveConfirmDialog(
+              chatRoom: widget.chatRoom,
+              leaveRoom: _leaveRoom,
+            ));
+  }
+
+  void _showRoomInfoDialog() {
+    showDialog(
+        context: context,
+        builder: (context) => ChatRoomInfoDialog(chatRoom: widget.chatRoom));
   }
 }

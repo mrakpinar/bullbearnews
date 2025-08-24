@@ -174,7 +174,6 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
       opacity: _fadeAnimation,
       child: _buildModernSection(
         title: 'Favorite Cryptos',
-        icon: Icons.star_rounded,
         isDark: isDark,
         child: Column(
           children: [
@@ -199,7 +198,6 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
 
   Widget _buildModernSection({
     required String title,
-    required IconData icon,
     required bool isDark,
     required Widget child,
   }) {
@@ -216,7 +214,7 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.red.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -230,8 +228,8 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.secondary.withOpacity(0.1),
-                  AppColors.accent.withOpacity(0.1),
+                  Colors.red.withOpacity(0.6),
+                  Colors.red.withOpacity(0.2),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -243,27 +241,6 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.secondary, AppColors.accent],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.secondary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppColors.whiteText,
-                    size: 24,
-                  ),
-                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -296,13 +273,13 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
                 if (!_isLoading)
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.secondary.withOpacity(0.1),
+                      color: Colors.red.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: IconButton(
                       icon: Icon(
                         Icons.refresh_rounded,
-                        color: AppColors.secondary,
+                        color: Colors.white,
                         size: 20,
                       ),
                       onPressed: _loadFavoriteCryptos,
@@ -419,7 +396,7 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: AppColors.accent.withOpacity(0.1),
+        color: Colors.red.withOpacity(0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppColors.accent.withOpacity(0.3),
@@ -431,12 +408,12 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.2),
+              color: Colors.red.withOpacity(0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.star_border_rounded,
-              color: AppColors.secondary,
+              color: Colors.red,
               size: 48,
             ),
           ),
@@ -463,37 +440,6 @@ class _FavoriteCryptosSectionState extends State<FavoriteCryptosSection>
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: AppColors.secondary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.secondary.withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.cloud_sync_rounded,
-                  color: AppColors.secondary,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Synced across all devices',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.w600,
-                    fontFamily: 'DMSerif',
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

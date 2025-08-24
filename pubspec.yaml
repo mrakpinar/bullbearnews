@@ -43,6 +43,9 @@ dependencies:
   googleapis: ^14.0.0
   googleapis_auth: ^2.0.0
   flutter_native_splash: ^2.4.6
+  workmanager: ^0.9.0+2
+  cloud_functions: ^5.6.2
+  crypto: ^3.0.6
 
 dev_dependencies:
   flutter_test:
@@ -58,10 +61,10 @@ flutter_launcher_icons:
   ios: true
 
   # Ana icon (iOS ve eski Android için)
-  image_path: "assets/icons/bull_bear_icon.png"
+  image_path: "assets/icons/icon_new.png"
 
   # Adaptive icon (Android 8.0+ için)
-  adaptive_icon_background: "assets/icons/icon_background.png" # veya "#FFFFFF" renk kodu
+  adaptive_icon_background: "assets/icons/icon_new.png" # veya "#FFFFFF" renk kodu
   # adaptive_icon_foreground: "assets/icons/icon_foreground.png"
 
   # iOS ayarları
@@ -74,10 +77,12 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/icons/
     - assets/icons/moon.png
     - assets/icons/sun.png
     - assets/image/
     - assets/splash/
+    - .env
 
   fonts:
     - family: Mono

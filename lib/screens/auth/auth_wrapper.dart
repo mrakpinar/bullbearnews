@@ -24,38 +24,9 @@ class AuthWrapper extends StatelessWidget {
           );
         }
 
-        // Kullanıcı oturum açmışsa ve email doğrulanmışsa ana sayfaya yönlendir
+        // Kullanıcı oturum açmışsa ana sayfaya yönlendir
         if (snapshot.hasData && snapshot.data != null) {
-          final user = snapshot.data!;
-
-          // Email doğrulanmış mı kontrol et
-          if (user.emailVerified) {
-            return MainNavigationScreen();
-          } else {
-            // Email doğrulanmamışsa çıkış yap ve auth screen'e yönlendir
-            _authService.signOut();
-            return Stack(
-              children: [
-                AuthScreen(),
-                // Offline banner
-                if (showOfflineBanner)
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      color: Colors.red,
-                      child: const Text(
-                        'Offline Mode',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          }
+          return MainNavigationScreen();
         } else {
           return Stack(
             children: [

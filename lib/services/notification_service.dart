@@ -12,6 +12,86 @@ class NotificationService {
   static const String LIKE_PORTFOLIO_TYPE = 'like_portfolio';
   static const String SHARE_PORTFOLIO_TYPE = 'share_portfolio';
   static const String NEW_ANNOUNCEMENT_TYPE = 'new_announcement';
+  static const String CHAT_MENTION_TYPE = 'chat_mention'; // Yeni bildirim türü
+
+  // YENİ: Chat mention bildirimi gönder
+  Future<void> sendChatMentionNotification({
+    required String mentionedUserId,
+    required String roomId,
+    required String roomName,
+    required String messageContent,
+    required String messageId,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.uid == mentionedUserId) return;
+
+    try {
+      print('🔔 Sending chat mention notification to: $mentionedUserId');
+      print('📝 Room: $roomName');
+      print(
+          '💬 Message preview: ${messageContent.length > 50 ? '${messageContent.substring(0, 50)}...' : messageContent}');
+
+      // Mevcut kullanıcının bilgilerini al
+      final currentUserDoc =
+          await _firestore.collection('users').doc(currentUser.uid).get();
+
+      if (!currentUserDoc.exists) {
+        print('❌ Current user document not found');
+        return;
+      }
+
+      final currentUserData = currentUserDoc.data()!;
+      final senderNickname = currentUserData['nickname'] ?? 'Unknown User';
+      final senderProfileImage = currentUserData['profileImageUrl'] ?? '';
+
+      // Bildirim oluştur
+      await _firestore
+          .collection('users')
+          .doc(mentionedUserId)
+          .collection('notifications')
+          .add({
+        'type': CHAT_MENTION_TYPE,
+        'senderId': currentUser.uid,
+        'senderName': currentUserData['name'] ?? 'Unknown User',
+        'senderNickname': senderNickname,
+        'senderProfileImage': senderProfileImage,
+        'roomId': roomId,
+        'roomName': roomName,
+        'messageContent': messageContent,
+        'messageId': messageId,
+        'message': '$senderNickname mentioned you in "$roomName"',
+        'isRead': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+
+      print('✅ Chat mention notification created in Firestore');
+
+      // Hedef kullanıcının okunmamış bildirim sayısını artır
+      await _incrementUnreadCount(mentionedUserId);
+
+      // Push notification gönder
+      await PushNotificationService.sendPushNotification(
+        targetUserId: mentionedUserId,
+        title: '💬 Mentioned in $roomName',
+        body:
+            '$senderNickname: ${messageContent.length > 100 ? '${messageContent.substring(0, 100)}...' : messageContent}',
+        data: {
+          'type': CHAT_MENTION_TYPE,
+          'senderId': currentUser.uid,
+          'senderNickname': senderNickname,
+          'roomId': roomId,
+          'roomName': roomName,
+          'messageId': messageId,
+          'messageContent': messageContent,
+          'click_action': 'FLUTTER_NOTIFICATION_CLICK',
+        },
+      );
+
+      print('✅ Chat mention push notification sent successfully');
+    } catch (e) {
+      print('❌ Chat mention notification error: $e');
+    }
+  }
 
   // Takip bildirimi gönder
   Future<void> sendFollowNotification(String targetUserId) async {
@@ -175,7 +255,7 @@ class NotificationService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      // Hedef kullanıcının okunmamış bildirim sayısını artır
+      // Hedef kullanıcının orunmamış bildirim sayısını artır
       await _incrementUnreadCount(portfolioOwnerId);
 
       // Push notification gönder

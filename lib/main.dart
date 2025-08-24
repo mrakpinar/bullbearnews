@@ -1,9 +1,7 @@
 // ignore: depend_on_referenced_packages
-// import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:bullbearnews/connectivity_service.dart';
 import 'package:bullbearnews/constants/colors.dart';
 import 'package:bullbearnews/models/news_model.dart';
-import 'package:bullbearnews/screens/auth/email_verification_screen.dart';
 import 'package:bullbearnews/screens/home/home_screen.dart';
 import 'package:bullbearnews/services/local_storage_service.dart';
 import 'package:flutter/material.dart';
@@ -183,7 +181,6 @@ class _MyAppState extends State<MyApp> {
       routes: {
         '/home': (context) => HomeScreen(),
         '/main': (context) => AuthWrapper(), // Bu satırı ekleyin
-        '/email-verification': (context) => EmailVerificationScreen(),
         '/auth': (context) => AuthWrapper(),
       },
     );

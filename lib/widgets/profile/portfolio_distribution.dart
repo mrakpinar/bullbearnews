@@ -98,8 +98,7 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
       child: SlideTransition(
         position: _slideAnimation,
         child: _buildModernSection(
-          title: 'Portfolio Distribution',
-          icon: Icons.pie_chart_rounded,
+          title: 'Portfolio Analysis',
           isDark: isDark,
           child: _buildContent(isDark),
         ),
@@ -109,7 +108,6 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
 
   Widget _buildModernSection({
     required String title,
-    required IconData icon,
     required bool isDark,
     required Widget child,
   }) {
@@ -126,7 +124,7 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.green.withOpacity(0.08),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -141,8 +139,8 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.secondary.withOpacity(0.1),
+                  Colors.green.withOpacity(0.3),
+                  Colors.greenAccent.withOpacity(0.3),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -154,27 +152,6 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [AppColors.primary, AppColors.secondary],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppColors.whiteText,
-                    size: 24,
-                  ),
-                ),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -207,13 +184,13 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
                 if (!_isLoading && _errorMessage == null)
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.8),
+                      color: Colors.green.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: IconButton(
                       icon: Icon(
                         Icons.refresh_rounded,
-                        color: AppColors.secondary,
+                        color: Colors.white.withOpacity(0.9),
                         size: 20,
                       ),
                       onPressed: _loadCryptoData,
@@ -371,7 +348,7 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
       child: Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: AppColors.accent.withOpacity(0.1),
+          color: Colors.green.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: AppColors.accent.withOpacity(0.3),
@@ -383,12 +360,12 @@ class _PortfolioDistributionState extends State<PortfolioDistribution>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: Colors.green.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.account_balance_wallet_outlined,
-                color: AppColors.secondary,
+                color: Colors.green,
                 size: 48,
               ),
             ),

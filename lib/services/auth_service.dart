@@ -12,9 +12,6 @@ class AuthService {
   // Mevcut kullanıcıyı getir
   User? get currentUser => _auth.currentUser;
 
-  // Email doğrulanmış mı kontrol et
-  bool get isEmailVerified => _auth.currentUser?.emailVerified ?? false;
-
   // Giriş yap
   Future<User?> signIn(String email, String password) async {
     try {
@@ -23,14 +20,6 @@ class AuthService {
         password: password,
       );
 
-      // Email doğrulanmamışsa hata fırlat
-      if (result.user != null && !result.user!.emailVerified) {
-        throw FirebaseAuthException(
-          code: 'email-not-verified',
-          message: 'Email address not verified. Please check your inbox.',
-        );
-      }
-
       return result.user;
     } catch (e) {
       print('Giriş hatası: $e');
@@ -38,11 +27,12 @@ class AuthService {
     }
   }
 
-// Kayıt ol - Basit ve güvenli versiyon
+  // Kayıt ol
   Future<User?> signUp(
       String email, String password, String name, String nickname) async {
     try {
-      // 1. Kullanıcıyı oluştur
+      print('🚀 Starting registration...');
+
       final UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
@@ -55,27 +45,21 @@ class AuthService {
       final user = result.user!;
       final userId = user.uid;
 
-      // 2. Kullanıcı bilgilerini güncelle (hata varsa devam et)
-      try {
-        await user.updateDisplayName(name);
-        print('Display name güncellendi');
-      } catch (e) {
-        print('Display name güncellenirken hata (devam ediliyor): $e');
-      }
+      // Display name güncelle
+      await user.updateDisplayName(name);
 
-      // 3. Firestore'a kaydet
+      // Firestore'a kaydet
       final userData = {
         'email': email,
         'name': name,
         'nickname': nickname,
         'bio': '',
-        'createdAt': DateTime.now(),
+        'createdAt': FieldValue.serverTimestamp(),
         'favoriteNews': [],
         'followers': [],
         'following': [],
         'profileImageUrl': '',
         'unreadNotificationCount': 0,
-        'emailVerified': false,
         'privacySettings': {
           'analyticsEnabled': true,
           'crashReportsEnabled': true,
@@ -84,99 +68,12 @@ class AuthService {
       };
 
       await _firestore.collection('users').doc(userId).set(userData);
-      print('Firestore kayıt tamamlandı');
 
-      // 4. Email doğrulama gönder
-      try {
-        await user.sendEmailVerification();
-        print('Email doğrulama gönderildi');
-      } catch (e) {
-        print('Email doğrulama gönderilirken hata (devam ediliyor): $e');
-      }
-
-      // 5. Çıkış yap
-      await _auth.signOut();
-      print('Kullanıcı çıkış yaptırıldı');
-
+      print('✅ Registration completed successfully');
       return user;
     } catch (e) {
-      print('Kayıt hatası: $e');
+      print('❌ Registration error: $e');
       rethrow;
-    }
-  }
-
-  // Email doğrulama mailini yeniden gönder
-  Future<void> resendEmailVerification(
-      {String? email, String? password}) async {
-    try {
-      User? user = _auth.currentUser;
-
-      // Eğer mevcut kullanıcı yoksa ve email/password verilmişse, geçici olarak giriş yap
-      if (user == null && email != null && password != null) {
-        final UserCredential result = await _auth.signInWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-        user = result.user;
-      }
-
-      if (user != null && !user.emailVerified) {
-        await user.sendEmailVerification();
-
-        // Eğer geçici giriş yaptıysak, tekrar çıkış yap
-        if (email != null && password != null) {
-          await _auth.signOut();
-        }
-      }
-    } catch (e) {
-      print('Email doğrulama gönderme hatası: $e');
-      rethrow;
-    }
-  }
-
-  // Email doğrulama durumunu kontrol et ve güncelle
-  Future<bool> checkEmailVerification({String? email, String? password}) async {
-    try {
-      User? user = _auth.currentUser;
-
-      // Eğer mevcut kullanıcı yoksa ve email/password verilmişse, geçici olarak giriş yap
-      if (user == null && email != null && password != null) {
-        try {
-          final UserCredential result = await _auth.signInWithEmailAndPassword(
-            email: email,
-            password: password,
-          );
-          user = result.user;
-        } catch (e) {
-          // Giriş yapılamadıysa false döndür
-          return false;
-        }
-      }
-
-      if (user != null) {
-        await user.reload(); // Kullanıcı bilgilerini yenile
-        user = _auth.currentUser; // Güncellenmiş kullanıcıyı al
-
-        if (user != null && user.emailVerified) {
-          // Firestore'da email doğrulama durumunu güncelle
-          await _firestore.collection('users').doc(user.uid).update({
-            'emailVerified': true,
-          });
-
-          // Eğer geçici giriş yaptıysak, kullanıcıyı giriş yapmış durumda bırak
-          // Çünkü email doğrulandı, artık giriş yapabilir
-          return true;
-        } else {
-          // Email henüz doğrulanmamışsa ve geçici giriş yaptıysak çıkış yap
-          if (email != null && password != null && user != null) {
-            await _auth.signOut();
-          }
-        }
-      }
-      return false;
-    } catch (e) {
-      print('Email doğrulama kontrol hatası: $e');
-      return false;
     }
   }
 

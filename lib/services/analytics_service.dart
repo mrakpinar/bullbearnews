@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AnalyticsService {
-  static const String SERVER_IP = '192.168.1.102';
+  static const String SERVER_IP = '192.168.137.75';
   static const int SERVER_PORT = 7860;
 
   // Detaylı network testi
@@ -49,7 +49,7 @@ class AnalyticsService {
             body: jsonEncode({
               'coin_name': 'TEST',
               'rsi': 50.0,
-              'macd': 'pozitif',
+              'macd': 'positive',
               'volume': 1000000.0,
             }),
           )
@@ -310,9 +310,9 @@ class AnalyticsService {
 
   // RSI durumunu belirleme
   static String getRSIStatus(double rsi) {
-    if (rsi >= 70) return 'Aşırı Alım';
-    if (rsi <= 30) return 'Aşırı Satım';
-    return 'Nötr';
+    if (rsi >= 70) return 'Overbought';
+    if (rsi <= 30) return 'Oversold';
+    return 'Neutral';
   }
 
   // RSI rengini belirleme
@@ -325,21 +325,21 @@ class AnalyticsService {
   // MACD durumunu belirleme
   static String getMACDStatus(String macd) {
     final lowerMacd = macd.toLowerCase();
-    if (lowerMacd.contains('pozitif') || lowerMacd.contains('positive')) {
-      return 'Pozitif';
-    } else if (lowerMacd.contains('negatif') ||
+    if (lowerMacd.contains('positive') || lowerMacd.contains('positive')) {
+      return 'Positive';
+    } else if (lowerMacd.contains('negative') ||
         lowerMacd.contains('negative')) {
-      return 'Negatif';
+      return 'Negative';
     }
-    return 'Nötr';
+    return 'Neutral';
   }
 
   // MACD rengini belirleme
   static Color getMACDColor(String macd) {
     final lowerMacd = macd.toLowerCase();
-    if (lowerMacd.contains('pozitif') || lowerMacd.contains('positive')) {
+    if (lowerMacd.contains('positive') || lowerMacd.contains('positive')) {
       return Colors.green;
-    } else if (lowerMacd.contains('negatif') ||
+    } else if (lowerMacd.contains('negative') ||
         lowerMacd.contains('negative')) {
       return Colors.red;
     }
@@ -351,66 +351,168 @@ class AnalyticsService {
       List<ChartCandle> candles) {
     if (candles.isEmpty) return {};
 
-    final closes = candles.map((c) => c.close).toList();
-    final volumes = candles.map((c) => c.volume).toList();
+    try {
+      final closes = candles.map((c) => c.close).toList();
+      final volumes = candles.map((c) => c.volume).toList();
 
-    return {
-      'rsi': calculateRSI(closes, 14),
-      'sma_20': calculateSMA(closes, 20),
-      'sma_50': calculateSMA(closes, 50),
-      'volume_avg': volumes.isNotEmpty
-          ? volumes.reduce((a, b) => a + b) / volumes.length
-          : 0,
-      'price_change_24h': closes.length >= 2
-          ? ((closes.last - closes[closes.length - 2]) /
-                  closes[closes.length - 2]) *
-              100
-          : 0,
-    };
+      final indicators = <String, dynamic>{};
+
+      // RSI calculation with error handling
+      try {
+        indicators['rsi'] = calculateRSI(closes, 14);
+      } catch (e) {
+        print('RSI calculation error: $e');
+        indicators['rsi'] = 50.0; // Default neutral RSI
+      }
+
+      // SMA calculations with error handling
+      try {
+        if (closes.length >= 20) {
+          indicators['sma_20'] = calculateSMA(closes, 20);
+        }
+        if (closes.length >= 50) {
+          indicators['sma_50'] = calculateSMA(closes, 50);
+        }
+      } catch (e) {
+        print('SMA calculation error: $e');
+      }
+
+      // Volume average
+      try {
+        indicators['volume_avg'] = volumes.isNotEmpty
+            ? volumes.reduce((a, b) => a + b) / volumes.length
+            : 0.0;
+      } catch (e) {
+        print('Volume calculation error: $e');
+        indicators['volume_avg'] = 0.0;
+      }
+
+      // Price change calculation
+      try {
+        indicators['price_change_24h'] = closes.length >= 2
+            ? ((closes.last - closes[closes.length - 2]) /
+                    closes[closes.length - 2]) *
+                100
+            : 0.0;
+      } catch (e) {
+        print('Price change calculation error: $e');
+        indicators['price_change_24h'] = 0.0;
+      }
+
+      return indicators;
+    } catch (e) {
+      print('Technical indicators calculation error: $e');
+      return {};
+    }
   }
 
 // Add this to AnalyticsService class
   static Map<String, dynamic> calculateMACD(List<double> prices) {
-    if (prices.length < 26) return {};
+    if (prices.length < 26) {
+      // Not enough data for MACD calculation
+      return {
+        'macd': 0.0,
+        'signal': 0.0,
+        'histogram': 0.0,
+        'status': 'neutral' // Default neutral status
+      };
+    }
 
-    final ema12 = calculateEMA(prices, 12);
-    final ema26 = calculateEMA(prices, 26);
+    try {
+      final ema12 = calculateEMA(prices, 12);
+      final ema26 = calculateEMA(prices, 26);
 
-    // Calculate MACD line (12-day EMA - 26-day EMA)
-    final macdLine = List<double>.generate(
-        prices.length, (i) => i >= 25 ? ema12[i] - ema26[i] : 0);
+      // Ensure we have enough EMA data
+      if (ema12.isEmpty || ema26.isEmpty) {
+        return {
+          'macd': 0.0,
+          'signal': 0.0,
+          'histogram': 0.0,
+          'status': 'neutral'
+        };
+      }
 
-    // Calculate signal line (9-day EMA of MACD line)
-    final signalLine = calculateEMA(macdLine.sublist(25), 9);
+      // Calculate MACD line (12-day EMA - 26-day EMA)
+      // Start from the point where both EMAs are available
+      final macdStartIndex = 25; // 26-day EMA starts from index 25
+      final macdLine = <double>[];
 
-    // Calculate MACD histogram (MACD line - signal line)
-    final histogram = List<double>.generate(
-        signalLine.length, (i) => macdLine[25 + i] - signalLine[i]);
+      for (int i = macdStartIndex;
+          i < prices.length && i < ema12.length && i < ema26.length;
+          i++) {
+        macdLine.add(ema12[i - macdStartIndex] - ema26[i - macdStartIndex]);
+      }
 
-    return {
-      'macd': macdLine.last,
-      'signal': signalLine.last,
-      'histogram': histogram.last,
-    };
+      if (macdLine.length < 9) {
+        // Not enough MACD data for signal line
+        return {
+          'macd': macdLine.isNotEmpty ? macdLine.last : 0.0,
+          'signal': 0.0,
+          'histogram': 0.0,
+          'status':
+              macdLine.isNotEmpty && macdLine.last > 0 ? 'positive' : 'negative'
+        };
+      }
+
+      // Calculate signal line (9-day EMA of MACD line)
+      final signalLine = calculateEMA(macdLine, 9);
+
+      if (signalLine.isEmpty) {
+        return {
+          'macd': macdLine.last,
+          'signal': 0.0,
+          'histogram': macdLine.last,
+          'status': macdLine.last > 0 ? 'positive' : 'negative'
+        };
+      }
+
+      // Calculate MACD histogram (MACD line - signal line)
+      final histogram = macdLine.last - signalLine.last;
+
+      return {
+        'macd': macdLine.last,
+        'signal': signalLine.last,
+        'histogram': histogram,
+        'status': histogram > 0 ? 'positive' : 'negative'
+      };
+    } catch (e) {
+      print('MACD calculation error: $e');
+      return {
+        'macd': 0.0,
+        'signal': 0.0,
+        'histogram': 0.0,
+        'status': 'neutral'
+      };
+    }
   }
 
   static List<double> calculateEMA(List<double> prices, int period) {
+    if (prices.length < period) {
+      return [];
+    }
+
     final List<double> ema = [];
-    final double multiplier = 2 / (period + 1);
+    final double multiplier = 2.0 / (period + 1);
 
-    // Simple MA for first value
-    double sum = 0;
-    for (int i = 0; i < period; i++) {
-      sum += prices[i];
+    try {
+      // Simple MA for first value
+      double sum = 0;
+      for (int i = 0; i < period && i < prices.length; i++) {
+        sum += prices[i];
+      }
+      ema.add(sum / period);
+
+      // EMA for subsequent values
+      for (int i = period; i < prices.length; i++) {
+        final currentEma = (prices[i] - ema.last) * multiplier + ema.last;
+        ema.add(currentEma);
+      }
+
+      return ema;
+    } catch (e) {
+      print('EMA calculation error: $e');
+      return [];
     }
-    ema.add(sum / period);
-
-    // EMA for subsequent values
-    for (int i = period; i < prices.length; i++) {
-      ema.add((prices[i] - ema.last) * multiplier + ema.last);
-    }
-
-    return ema;
   }
 
   // RSI hesaplama

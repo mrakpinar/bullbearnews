@@ -1,5 +1,5 @@
 import 'package:bullbearnews/constants/colors.dart';
-import 'package:bullbearnews/screens/analytics/analytics_screen.dart';
+import 'package:bullbearnews/screens/analytics/analysis_screen.dart';
 import 'package:bullbearnews/screens/videos/videos_screen.dart';
 import 'package:flutter/material.dart';
 import 'home/home_screen.dart';
@@ -18,7 +18,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen>
     with SingleTickerProviderStateMixin {
-  int _selectedIndex = 0;
+  int _selectedIndex = 5;
   late final PageController _pageController;
   late AnimationController _animationController;
 

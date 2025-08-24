@@ -1,4 +1,6 @@
 // widgets/crypto_details/crypto_auto_analysis_card.dart
+// widgets/crypto_details/crypto_auto_analysis_card.dart
+import 'package:bullbearnews/widgets/premium/premium_widgets.dart';
 import 'package:flutter/material.dart';
 import '../../../models/crypto_model.dart';
 import '../../../services/auto_analysis_service.dart';
@@ -24,6 +26,7 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
   DateTime? _lastAnalysisTime;
   bool _isPremium = false;
   int _remainingAnalyses = 0;
+  int _todayAnalysisCount = 0;
   List<AnalysisHistoryItem> _analysisHistory = [];
   bool _showHistory = false;
 
@@ -61,11 +64,13 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
   Future<void> _loadPremiumStatus() async {
     final isPremium = await PremiumAnalysisService.isPremiumUser();
     final remaining = await PremiumAnalysisService.getRemainingAnalyses();
+    final todayCount = await PremiumAnalysisService.getTodayAnalysisCount();
 
     if (mounted) {
       setState(() {
         _isPremium = isPremium;
         _remainingAnalyses = remaining;
+        _todayAnalysisCount = todayCount;
       });
     }
   }
@@ -126,6 +131,11 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
           _lastAnalysisTime = DateTime.now();
         });
 
+        // Analiz sayacını artır (premium olmayan kullanıcılar için)
+        if (!_isPremium) {
+          await PremiumAnalysisService.incrementAnalysisCount();
+        }
+
         // Analizi history'ye kaydet
         final historyItem = AnalysisHistoryItem(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -139,7 +149,7 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
 
         await PremiumAnalysisService.saveAnalysisToHistory(historyItem);
         await _loadAnalysisHistory();
-        await _loadPremiumStatus(); // Kalan analiz sayısını güncelle
+        await _loadPremiumStatus(); // Status'u güncelle
 
         _pulseController.stop();
         _resultController.forward();
@@ -161,55 +171,14 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
   }
 
   void _showPremiumDialog() {
-    showDialog(
+    PremiumWidgets.showPremiumDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? const Color(0xFF393E46)
-            : Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Colors.orange, Colors.deepOrange],
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.workspace_premium,
-                  color: Colors.white, size: 20),
-            ),
-            const SizedBox(width: 12),
-            const Text('Premium Required'),
-          ],
-        ),
-        content: Text(PremiumAnalysisService.getPremiumUpgradeMessage()),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Later'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              // Test için premium aktif et
-              await PremiumAnalysisService.setPremiumStatus(true);
-              await _loadPremiumStatus();
-              Navigator.pop(context);
-              _showSnackBar('🎉 Premium activated for testing!',
-                  isSuccess: true);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Upgrade', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
+      remainingAnalyses: _remainingAnalyses,
+      todayAnalysisCount: _todayAnalysisCount,
+    ).then((_) {
+      // Dialog kapatıldıktan sonra status'u güncelle
+      _loadPremiumStatus();
+    });
   }
 
   void _showProgress(String message) {
@@ -285,7 +254,16 @@ class _CryptoAutoAnalysisCardState extends State<CryptoAutoAnalysisCard>
             _buildHeader(isDark),
             const SizedBox(height: 16),
             _buildStatusInfo(isDark),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            // Premium limit warning (sadece free kullanıcılar için)
+            if (!_isPremium && _remainingAnalyses <= 0)
+              PremiumWidgets.buildLimitWarningCard(
+                isDark: isDark,
+                todayAnalysisCount: _todayAnalysisCount,
+                remainingAnalyses: _remainingAnalyses,
+                onUpgrade: _showPremiumDialog,
+              ),
+            const SizedBox(height: 4),
             _buildAnalysisButton(isDark),
             if (_technicalData != null) ...[
               const SizedBox(height: 20),

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel 
 import openai
 import os
 from dotenv import load_dotenv
@@ -40,7 +40,7 @@ async def analyze(request: AnalysisRequest):
         rsi_signal = "neutral zone"
     
     # MACD sinyali
-    macd_signal = "bullish momentum" if request.macd.lower() == "pozitif" else "bearish momentum"
+    macd_signal = "bullish momentum" if request.macd.lower() == "positive" else "bearish momentum"
     
     # Volume analizi
     volume_analysis = "high volume" if request.volume > 50000000 else "low volume"

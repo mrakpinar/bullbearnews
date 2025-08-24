@@ -45,7 +45,9 @@ class ReplyPreview extends StatelessWidget {
                   'Replying to ${message.username}',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.secondary,
-                    fontWeight: FontWeight.w600,
+                    fontWeight: FontWeight.w400,
+                    fontSize: 16,
+                    fontFamily: 'Mono',
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -55,6 +57,8 @@ class ReplyPreview extends StatelessWidget {
                     color: theme.brightness == Brightness.dark
                         ? Colors.grey[400]
                         : Colors.grey[600],
+                    fontSize: 16,
+                    fontFamily: 'DMSerif',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

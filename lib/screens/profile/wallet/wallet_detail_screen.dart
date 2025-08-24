@@ -2,6 +2,7 @@ import 'package:bullbearnews/models/wallet_model.dart';
 import 'package:bullbearnews/screens/profile/wallet/edit_asset_screen.dart';
 import 'package:bullbearnews/services/crypto_service.dart';
 import 'package:bullbearnews/models/crypto_model.dart';
+import 'package:bullbearnews/widgets/wallet_detail/portfolio_summary_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -31,6 +32,9 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final CryptoService _cryptoService = CryptoService();
 
+  final TextEditingController _nameController = TextEditingController();
+  bool _isEditingName = false;
+
   Map<String, dynamic>? _ownerInfo;
   List<CryptoModel> _cryptoData = [];
   bool _isLoadingCrypto = true;
@@ -39,11 +43,64 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
   void initState() {
     super.initState();
     _wallet = widget.wallet;
+    _nameController.text = _wallet.name;
+
     _loadCryptoData();
 
     if (widget.isSharedView && widget.ownerId != null) {
       _loadOwnerInfo();
       _incrementViewCount();
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _updateWalletName() async {
+    if (_nameController.text.trim().isEmpty) return;
+    if (_nameController.text.trim() == _wallet.name) {
+      setState(() => _isEditingName = false);
+      return;
+    }
+
+    try {
+      final user = _auth.currentUser;
+      if (user == null) throw Exception('User not logged in');
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('wallets')
+          .doc(_wallet.id)
+          .update({
+        'name': _nameController.text.trim(),
+      });
+
+      if (mounted) {
+        setState(() {
+          _wallet = _wallet.copyWith(name: _nameController.text.trim());
+          _isEditingName = false;
+        });
+        widget.onUpdate();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Wallet name updated successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error updating wallet name: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -696,28 +753,66 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: Column(
-          children: [
-            Text(
-              _wallet.name,
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            if (widget.isSharedView && _ownerInfo != null)
-              Text(
-                'by ${_ownerInfo!['nickname'] ?? 'Unknown'}',
+        title: _isEditingName
+            ? TextField(
+                controller: _nameController,
                 style: TextStyle(
-                  fontSize: 14,
-                  color: isDark ? Colors.white70 : Colors.black54,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
                   fontFamily: 'DMSerif',
                 ),
+                decoration: InputDecoration(
+                  border: InputBorder.none,
+                  hintText: 'Wallet name',
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.check, color: Colors.green),
+                        onPressed: _updateWalletName,
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: Colors.red),
+                        onPressed: () {
+                          setState(() {
+                            _isEditingName = false;
+                            _nameController.text = _wallet.name;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                onSubmitted: (_) => _updateWalletName(),
+              )
+            : Column(
+                children: [
+                  GestureDetector(
+                    onTap: widget.isSharedView
+                        ? null
+                        : () => setState(() => _isEditingName = true),
+                    child: Text(
+                      _wallet.name,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isDark ? Colors.white : Colors.black,
+                        fontFamily: 'DMSerif',
+                      ),
+                    ),
+                  ),
+                  if (widget.isSharedView && _ownerInfo != null)
+                    Text(
+                      'by ${_ownerInfo!['nickname'] ?? 'Unknown'}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark ? Colors.white70 : Colors.black54,
+                        fontFamily: 'DMSerif',
+                      ),
+                    ),
+                ],
               ),
-          ],
-        ),
         leading: Container(
           margin: const EdgeInsets.all(8),
           decoration: BoxDecoration(
@@ -896,7 +991,14 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
       body: Column(
         children: [
           // Portfolio Summary Card
-          _buildPortfolioSummary(isDark),
+          PortfolioSummaryWidget(
+            isDark: isDark,
+            isLoadingCrypto: _isLoadingCrypto,
+            currentValue: _calculateCurrentValue(),
+            profitLoss: _calculateProfitLoss(),
+            totalInvestmentValue: _wallet.totalInvestmentValue,
+            assetCount: _wallet.items.length,
+          ),
 
           // Assets List
           Expanded(
@@ -913,166 +1015,6 @@ class _WalletDetailScreenState extends State<WalletDetailScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPortfolioSummary(bool isDark) {
-    final currentValue = _calculateCurrentValue();
-    final profitLoss = _calculateProfitLoss();
-    final isProfit = profitLoss >= 0;
-    final profitLossPercentage = _wallet.totalInvestmentValue > 0
-        ? (profitLoss / _wallet.totalInvestmentValue) * 100
-        : 0.0;
-
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            isDark ? Colors.grey[800]! : Colors.white,
-            isDark ? Colors.grey[900]! : Colors.grey[50]!,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          tileMode: TileMode.clamp,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Total Value',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDark ? Colors.white70 : Colors.black54,
-                      fontFamily: 'DMSerif',
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isLoadingCrypto
-                        ? 'Loading...'
-                        : '\$${currentValue.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? Colors.white : Colors.black,
-                      fontFamily: 'DMSerif',
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color:
-                      (isProfit ? Colors.green : Colors.red).withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color:
-                        (isProfit ? Colors.green : Colors.red).withOpacity(0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isProfit ? Icons.trending_up : Icons.trending_down,
-                      color: isProfit ? Colors.green : Colors.red,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${isProfit ? '+' : ''}\$${profitLoss.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: isProfit ? Colors.green : Colors.red,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'DMSerif',
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildStatItem(
-                'Invested',
-                '\$${_wallet.totalInvestmentValue.toStringAsFixed(2)}',
-                Icons.account_balance_wallet,
-                Colors.blue,
-                isDark,
-              ),
-              _buildStatItem(
-                'Assets',
-                '${_wallet.items.length}',
-                Icons.pie_chart,
-                Colors.orange,
-                isDark,
-              ),
-              _buildStatItem(
-                'Change',
-                '${isProfit ? '+' : ''}${profitLossPercentage.toStringAsFixed(1)}%',
-                isProfit ? Icons.arrow_upward : Icons.arrow_downward,
-                isProfit ? Colors.green : Colors.red,
-                isDark,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatItem(
-      String label, String value, IconData icon, Color color, bool isDark) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: isDark ? Colors.white : Colors.black,
-            fontFamily: 'DMSerif',
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: isDark ? Colors.white70 : Colors.black54,
-            fontFamily: 'DMSerif',
-          ),
-        ),
-      ],
     );
   }
 

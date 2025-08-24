@@ -114,7 +114,7 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
         position: _slideAnimation,
         child: _buildModernSection(
           title: 'Shared Portfolios',
-          icon: Icons.share_rounded,
+          // icon: Icons.share_rounded,
           isDark: isDark,
           child: _buildContent(isDark),
         ),
@@ -124,7 +124,7 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
 
   Widget _buildModernSection({
     required String title,
-    required IconData icon,
+    // required IconData icon,
     required bool isDark,
     required Widget child,
   }) {
@@ -159,8 +159,8 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.green.withOpacity(0.1),
-                  Colors.teal.withOpacity(0.1),
+                  Color(0xFF9C27B0).withOpacity(0.1),
+                  Color.fromARGB(255, 216, 113, 235).withOpacity(0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -172,27 +172,30 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
             ),
             child: Row(
               children: [
-                Container(
-                  padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Colors.green, Colors.teal],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppColors.whiteText,
-                    size: isSmallScreen ? 20 : 24,
-                  ),
-                ),
+                // Container(
+                //   padding: EdgeInsets.all(isSmallScreen ? 8 : 12),
+                //   decoration: BoxDecoration(
+                //     gradient: const LinearGradient(
+                //       colors: [
+                //         Color(0xFF9C27B0),
+                //         Color.fromARGB(255, 201, 68, 224)
+                //       ],
+                //     ),
+                //     borderRadius: BorderRadius.circular(16),
+                //     boxShadow: [
+                //       BoxShadow(
+                //         color: Color(0xFF9C27B0).withOpacity(0.3),
+                //         blurRadius: 8,
+                //         offset: const Offset(0, 4),
+                //       ),
+                //     ],
+                //   ),
+                // child: Icon(
+                //   icon,
+                //   color: AppColors.whiteText,
+                //   size: isSmallScreen ? 20 : 24,
+                // ),
+                // ),
                 SizedBox(width: isSmallScreen ? 12 : 16),
                 Expanded(
                   child: Column(
@@ -225,13 +228,13 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
                 if (!_isLoading && _errorMessage.isEmpty)
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: Color(0xFF9C27B0).withOpacity(0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: IconButton(
                       icon: Icon(
                         Icons.refresh_rounded,
-                        color: Colors.green,
+                        color: Color(0xFF9C27B0),
                         size: isSmallScreen ? 18 : 20,
                       ),
                       onPressed: _loadMySharedPortfolios,
@@ -269,10 +272,12 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
       return _buildEmptyStateCard(isDark);
     }
 
-    return Column(
-      children: _mySharedPortfolios
-          .map((portfolio) => _buildSharedPortfolioItem(portfolio, isDark))
-          .toList(),
+    return Center(
+      child: Column(
+        children: _mySharedPortfolios
+            .map((portfolio) => _buildSharedPortfolioItem(portfolio, isDark))
+            .toList(),
+      ),
     );
   }
 
@@ -377,53 +382,55 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 600;
 
-    return Container(
-      padding: EdgeInsets.all(isSmallScreen ? 24 : 32),
-      decoration: BoxDecoration(
-        color: Colors.green.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.green.withOpacity(0.3),
-          width: 1,
+    return Center(
+      child: Container(
+        padding: EdgeInsets.all(isSmallScreen ? 24 : 32),
+        decoration: BoxDecoration(
+          color: Color(0xFF9C27B0).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Color(0xFF9C27B0).withOpacity(0.3),
+            width: 1,
+          ),
         ),
-      ),
-      child: Column(
-        children: [
-          Container(
-            padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.2),
-              shape: BoxShape.circle,
+        child: Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+              decoration: BoxDecoration(
+                color: Color(0xFF9C27B0).withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.share_outlined,
+                color: Color(0xFF9C27B0),
+                size: isSmallScreen ? 36 : 48,
+              ),
             ),
-            child: Icon(
-              Icons.share_outlined,
-              color: Colors.green.shade600,
-              size: isSmallScreen ? 36 : 48,
+            const SizedBox(height: 16),
+            Text(
+              'No Shared Portfolios',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 18 : 20,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppColors.lightText : AppColors.darkText,
+                fontFamily: 'DMSerif',
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'No Shared Portfolios',
-            style: TextStyle(
-              fontSize: isSmallScreen ? 18 : 20,
-              fontWeight: FontWeight.bold,
-              color: isDark ? AppColors.lightText : AppColors.darkText,
-              fontFamily: 'DMSerif',
+            const SizedBox(height: 8),
+            Text(
+              'Share your portfolios with others to\nsee them appear here',
+              style: TextStyle(
+                fontSize: isSmallScreen ? 12 : 14,
+                color: isDark
+                    ? AppColors.lightText.withOpacity(0.7)
+                    : AppColors.darkText.withOpacity(0.7),
+                fontFamily: 'DMSerif',
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Share your portfolios with others to\nsee them appear here',
-            style: TextStyle(
-              fontSize: isSmallScreen ? 12 : 14,
-              color: isDark
-                  ? AppColors.lightText.withOpacity(0.7)
-                  : AppColors.darkText.withOpacity(0.7),
-              fontFamily: 'DMSerif',
-            ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -442,31 +449,33 @@ class _SharedPortfoliosSectionState extends State<SharedPortfoliosSection>
           .get(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(
-                  color: isDark
-                      ? AppColors.lightText.withOpacity(0.1)
-                      : AppColors.darkText.withOpacity(0.1),
+          return Center(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(
+                    color: isDark
+                        ? AppColors.lightText.withOpacity(0.1)
+                        : AppColors.darkText.withOpacity(0.1),
+                  ),
                 ),
-              ),
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              child: Padding(
-                padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
-                child: const Row(
-                  children: [
-                    SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    SizedBox(width: 16),
-                    Expanded(child: Text('Loading portfolio...')),
-                  ],
+                color: isDark ? AppColors.darkCard : AppColors.lightCard,
+                child: Padding(
+                  padding: EdgeInsets.all(isSmallScreen ? 16 : 20),
+                  child: const Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      SizedBox(width: 16),
+                      Expanded(child: Text('Loading portfolio...')),
+                    ],
+                  ),
                 ),
               ),
             ),

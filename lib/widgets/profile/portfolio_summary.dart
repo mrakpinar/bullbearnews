@@ -1,4 +1,5 @@
 import 'package:bullbearnews/models/crypto_model.dart';
+import 'package:bullbearnews/screens/profile/portfolio/portfolio_analysis_screen.dart';
 import 'package:bullbearnews/screens/profile/portfolio/portfolio_detail_screen.dart';
 import 'package:bullbearnews/screens/profile/wallet/wallets_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -207,6 +208,40 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
     return _buildPortfolioSummaryCard(isDarkMode);
   }
 
+  Future<void> _navigateToAnalysis() async {
+    if (_walletItems.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              Icon(
+                Icons.warning_outlined,
+                color: Colors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              const Text('Add cryptocurrencies to your portfolio first'),
+            ],
+          ),
+          backgroundColor: Colors.orange.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const PortfolioAnalysisScreen(),
+      ),
+    );
+  }
+
   Widget _buildPortfolioSummaryCard(bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -332,6 +367,17 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionButton(
+                  icon: Icons.analytics_outlined,
+                  label: 'Analyze',
+                  onPressed:
+                      _navigateToAnalysis, // Parent widget'tan geçirilecek
+                  isDarkMode: isDarkMode,
+                  // isHighlighted: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActionButton(
                   icon: Icons.pie_chart_outline,
                   label: 'Details',
                   onPressed:
@@ -351,16 +397,21 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
     required String label,
     required VoidCallback onPressed,
     required bool isDarkMode,
+    bool isHighlighted = false,
   }) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF948979).withOpacity(0.1),
+        backgroundColor: isHighlighted
+            ? const Color(0xFF948979).withOpacity(0.1)
+            : const Color(0xFF948979).withOpacity(0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(
-            color: const Color(0xFF948979).withOpacity(0.3),
-            width: 1,
+            color: isHighlighted
+                ? const Color(0xFF948979).withOpacity(0.5)
+                : const Color(0xFF948979).withOpacity(0.3),
+            width: isHighlighted ? 1.5 : 1,
           ),
         ),
         padding: const EdgeInsets.symmetric(vertical: 12),
@@ -371,17 +422,23 @@ class _PortfolioSummaryState extends State<PortfolioSummary> {
           Icon(
             icon,
             size: 20,
-            color:
-                isDarkMode ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
+            color: isHighlighted
+                ? const Color(0xFF948979)
+                : isDarkMode
+                    ? const Color(0xFFDFD0B8)
+                    : const Color(0xFF222831),
           ),
           const SizedBox(width: 8),
           Text(
             label,
             style: TextStyle(
-              color: isDarkMode
-                  ? const Color(0xFFDFD0B8)
-                  : const Color(0xFF222831),
+              color: isHighlighted
+                  ? const Color(0xFF948979)
+                  : isDarkMode
+                      ? const Color(0xFFDFD0B8)
+                      : const Color(0xFF222831),
               fontFamily: 'DMSerif',
+              fontWeight: isHighlighted ? FontWeight.w600 : FontWeight.normal,
             ),
           ),
         ],

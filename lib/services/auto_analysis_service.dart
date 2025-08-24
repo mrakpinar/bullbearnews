@@ -1,12 +1,11 @@
-// services/auto_analysis_service.dart
 import 'dart:convert';
 import 'dart:math';
 import 'package:http/http.dart' as http;
 
 class AutoAnalysisService {
   static const String _baseUrl =
-      'http://192.168.1.102:7860'; // Android emulator için
-  // static const String _baseUrl = 'http://localhost:8000'; // iOS simulator için
+      'http://192.168.137.75:7860'; // Android emulator için
+  // static const String _baseUrl = 'http://localhost:8000'; // iOS simulator iSçin
 
   static Future<Map<String, dynamic>?> performCompleteAnalysis({
     required String symbol,

@@ -194,7 +194,6 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
         position: _slideAnimation,
         child: _buildModernSection(
           title: 'Saved News',
-          icon: Icons.bookmark_rounded,
           isDark: isDark,
           child: StreamBuilder<int>(
             stream: _firebaseSavedNewsService.getSavedNewsCountStream(),
@@ -221,7 +220,6 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
 
   Widget _buildModernSection({
     required String title,
-    required IconData icon,
     required bool isDark,
     required Widget child,
   }) {
@@ -253,8 +251,8 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.orange.withOpacity(0.1),
-                  Colors.deepOrange.withOpacity(0.1),
+                  Colors.blue.withOpacity(0.1),
+                  Colors.lightBlue.withOpacity(0.1),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -266,28 +264,6 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
             ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Colors.orange, Colors.deepOrange],
-                    ),
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    icon,
-                    color: AppColors.whiteText,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,7 +306,7 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
                     // Refresh Button
                     Container(
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1),
+                        color: Colors.blue.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: IconButton(
@@ -338,7 +314,7 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
                           _isLoading
                               ? Icons.hourglass_empty
                               : Icons.refresh_rounded,
-                          color: Colors.orange,
+                          color: Colors.blue,
                           size: 20,
                         ),
                         onPressed: _isLoading ? null : _refreshSavedNews,
@@ -391,10 +367,10 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
       child: Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.1),
+          color: Colors.blue.withOpacity(0.1),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Colors.orange.withOpacity(0.3),
+            color: Colors.blue.withOpacity(0.3),
             width: 1,
           ),
         ),
@@ -403,12 +379,12 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.2),
+                color: Colors.blue.withOpacity(0.2),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.bookmark_border_rounded,
-                color: Colors.orange.shade600,
+                color: Colors.blue.shade600,
                 size: 48,
               ),
             ),
@@ -439,7 +415,7 @@ class _SavedNewsSectionState extends State<SavedNewsSection>
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.orange, Colors.deepOrange],
+                  colors: [Colors.blue, Colors.lightBlue],
                 ),
                 borderRadius: BorderRadius.circular(20),
               ),

@@ -1,8 +1,11 @@
+import 'package:bullbearnews/screens/community/chat_screen.dart';
+import 'package:bullbearnews/widgets/notification/notification_content.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../services/notification_service.dart';
 import '../../constants/colors.dart';
 import '../../models/wallet_model.dart';
+import '../../models/chat_room_model.dart';
 import '../profile/shown_profile_screen.dart';
 import '../profile/wallet/wallet_detail_screen.dart';
 
@@ -44,66 +47,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        title: Text(
-          'Notifications',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: isDark ? AppColors.lightText : AppColors.darkText,
-            fontFamily: 'DMSerif',
-          ),
-        ),
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : AppColors.lightCard,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new,
-              size: 20,
-              color: isDark ? AppColors.lightText : AppColors.darkText,
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.done_all,
-                size: 20,
-                color: AppColors.secondary,
-              ),
-              tooltip: 'Mark all as read',
-              onPressed: () async {
-                await _notificationService.markAllAsRead();
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('All notifications marked as read'),
-                      backgroundColor: Colors.green.shade700,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  );
-                }
-              },
-            ),
-          ),
-        ],
-      ),
+      appBar: _buildAppBar(isDark),
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: StreamBuilder<QuerySnapshot>(
@@ -206,7 +150,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'When someone follows you or likes your\nportfolio, you\'ll see it here',
+                      'When someone follows you, likes your\nportfolio, or mentions you in chat, you\'ll see it here',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 16,
@@ -260,11 +204,12 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                     child: AnimatedContainer(
                       duration: Duration(milliseconds: 300 + (index * 50)),
                       curve: Curves.easeOutBack,
-                      child: _buildNotificationContent(
-                        notification.id,
-                        data,
-                        isDark,
-                        index,
+                      child: NotificationContent(
+                        notificationId: notification.id,
+                        data: data,
+                        isDark: isDark,
+                        index: index,
+                        onNotificationTap: _handleNotificationTap,
                       ),
                     ),
                   );
@@ -277,243 +222,314 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
   }
 
-  Widget _buildNotificationContent(
+  AppBar _buildAppBar(bool isDark) {
+    return AppBar(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      title: Text(
+        'Notifications',
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: isDark ? AppColors.lightText : AppColors.darkText,
+          fontFamily: 'DMSerif',
+        ),
+      ),
+      leading: Container(
+        margin: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: isDark ? AppColors.lightText : AppColors.darkText,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: IconButton(
+            icon: Icon(
+              Icons.done_all,
+              size: 20,
+              color: AppColors.secondary,
+            ),
+            tooltip: 'Mark all as read',
+            onPressed: () async {
+              await _notificationService.markAllAsRead();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('All notifications marked as read'),
+                    backgroundColor: Colors.green.shade700,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                );
+              }
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Chat room'a navigate etme fonksiyonu
+  Future<void> _navigateToChatRoom(
+    String roomId,
+    String? messageId,
+    bool isDark,
+  ) async {
+    try {
+      // Loading göster
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.secondary),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      // Chat room verilerini Firestore'dan çek
+      final roomDoc = await FirebaseFirestore.instance
+          .collection('chatRooms')
+          .doc(roomId)
+          .get();
+
+      // Loading dialog'unu kapat
+      Navigator.pop(context);
+
+      if (!roomDoc.exists) {
+        _showErrorSnackBar('Chat room not found or no longer available');
+        return;
+      }
+
+      if (!mounted) return;
+
+      // ChatRoom modelini oluştur
+      final chatRoom = ChatRoom.fromFirestore(roomDoc);
+
+      // ChatScreen'e navigate et
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ChatScreen(
+            chatRoom: chatRoom,
+            highlightMessageId: messageId, // Mesajı highlight et
+          ),
+        ),
+      );
+    } catch (e) {
+      // Loading dialog'unu kapat (eğer açıksa)
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      print('Error navigating to chat room: $e');
+      _showErrorSnackBar('Error loading chat room: ${e.toString()}');
+    }
+  }
+
+  Future<void> _handleNotificationTap(
     String notificationId,
     Map<String, dynamic> data,
     bool isDark,
-    int index,
-  ) {
+  ) async {
     final isRead = data['isRead'] ?? false;
     final type = data['type'] ?? '';
-    final senderNickname = data['senderNickname'] ?? 'Unknown';
-    final senderProfileImage = data['senderProfileImage'] ?? '';
-    final createdAt = data['createdAt'] as Timestamp?;
     final senderId = data['senderId'] ?? '';
 
-    return Card(
-      elevation: 0,
-      color: isRead
-          ? (isDark
-              ? AppColors.darkCard
-              : AppColors.lightCard) // Okunmuşsa normal renk
-          : (isDark
-              ? AppColors.lightBackground
-                  .withOpacity(0.2) // Okunmamış dark mode rengi
-              : Colors.blue.shade50),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: isRead
-              ? Colors.transparent
-              : AppColors.secondary.withOpacity(0.8),
-          width: isRead ? 0 : 1.5,
-        ),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () async {
-          if (!isRead) {
-            _notificationService.markAsRead(notificationId);
-          }
+    // Mark as read if not already read
+    if (!isRead) {
+      await _notificationService.markAsRead(notificationId);
+    }
 
-          if (type == NotificationService.FOLLOW_TYPE) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => ShownProfileScreen(userId: senderId),
-              ),
-            );
-          }
+    // Handle navigation based on notification type
+    switch (type) {
+      case NotificationService.FOLLOW_TYPE:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShownProfileScreen(userId: senderId),
+          ),
+        );
+        break;
 
-          if (type == NotificationService.SHARE_PORTFOLIO_TYPE) {
-            final walletId = data['walletId'] ?? '';
-            final senderId = data['senderId'] ?? '';
+      case NotificationService.CHAT_MENTION_TYPE:
+        final roomId = data['roomId'] ?? '';
+        final messageId = data['messageId'] ?? '';
 
-            if (walletId.isNotEmpty && senderId.isNotEmpty) {
-              try {
-                final walletDoc = await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(senderId)
-                    .collection('wallets')
-                    .doc(walletId)
-                    .get();
+        if (roomId.isNotEmpty) {
+          await _navigateToChatRoom(roomId, messageId, isDark);
+        } else {
+          _showErrorSnackBar('Chat room information not available');
+        }
+        break;
 
-                if (walletDoc.exists && mounted) {
-                  final wallet = Wallet.fromJson(walletDoc.data()!)
-                      .copyWith(id: walletDoc.id);
+      case NotificationService.NEW_ANNOUNCEMENT_TYPE:
+        final title = data['title'] ?? '';
+        final content = data['content'] ?? '';
 
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => WalletDetailScreen(
-                        wallet: wallet,
-                        onUpdate: () {},
-                        isSharedView: true,
-                      ),
-                    ),
-                  );
-                } else {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content:
-                            const Text('This portfolio is no longer available'),
-                        backgroundColor: Colors.orange.shade600,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    );
-                  }
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error loading portfolio: $e'),
-                      backgroundColor: Colors.red.shade600,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  );
-                }
-              }
-            }
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color:
-                            isRead ? Colors.transparent : AppColors.secondary,
-                        width: 2,
-                      ),
-                    ),
-                    child: CircleAvatar(
-                      radius: 16,
-                      backgroundColor: AppColors.accent.withOpacity(0.3),
-                      backgroundImage: senderProfileImage.isNotEmpty
-                          ? NetworkImage(senderProfileImage)
-                          : null,
-                      child: senderProfileImage.isEmpty
-                          ? Icon(
-                              Icons.person,
-                              color: AppColors.secondary,
-                              size: 28,
-                            )
-                          : null,
+        // Announcement detay sayfasını göster
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Row(
+              children: [
+                Icon(
+                  Icons.campaign,
+                  color: Colors.orange.shade700,
+                  size: 24,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.lightText : AppColors.darkText,
+                      fontFamily: 'DMSerif',
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    RichText(
-                      text: TextSpan(
-                        children: [
-                          TextSpan(
-                            text: senderNickname,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.lightText
-                                  : AppColors.darkText,
-                              fontFamily: 'DMSerif',
-                            ),
-                          ),
-                          TextSpan(
-                            text: ' ${_getActionText(type)}',
-                            style: TextStyle(
-                              fontWeight: FontWeight.normal,
-                              fontSize: 12,
-                              color: isDark
-                                  ? AppColors.lightText.withOpacity(0.8)
-                                  : AppColors.darkText.withOpacity(0.8),
-                              fontFamily: 'DMSerif',
-                            ),
-                          ),
-                        ],
-                      ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    content,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDark
+                          ? AppColors.lightText.withOpacity(0.9)
+                          : AppColors.darkText.withOpacity(0.9),
+                      fontFamily: 'DMSerif',
+                      height: 1.5,
                     ),
-                    if (data['walletName'] != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        '"${data['walletName']}"',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic,
-                          color: AppColors.secondary,
-                          fontFamily: 'DMSerif',
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 8),
-                    Text(
-                      _formatTimeAgo(createdAt),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark
-                            ? AppColors.lightText.withOpacity(0.6)
-                            : AppColors.darkText.withOpacity(0.6),
-                        fontFamily: 'DMSerif',
+                  ),
+                  if (data['imageUrl'] != null &&
+                      data['imageUrl'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        data['imageUrl'],
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const SizedBox.shrink(),
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  'Close',
+                  style: TextStyle(
+                    color: AppColors.secondary,
+                    fontFamily: 'DMSerif',
+                  ),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
+        );
+        break;
 
-  String _getActionText(String type) {
-    switch (type) {
-      case NotificationService.FOLLOW_TYPE:
-        return 'started following you';
-      case NotificationService.UNFOLLOW_TYPE:
-        return 'stopped following you';
-      case NotificationService.LIKE_PORTFOLIO_TYPE:
-        return 'liked your portfolio';
       case NotificationService.SHARE_PORTFOLIO_TYPE:
-        return 'shared a new portfolio';
-      default:
-        return 'sent you a notification';
+        final walletId = data['walletId'] ?? '';
+
+        if (walletId.isNotEmpty && senderId.isNotEmpty) {
+          try {
+            final walletDoc = await FirebaseFirestore.instance
+                .collection('users')
+                .doc(senderId)
+                .collection('wallets')
+                .doc(walletId)
+                .get();
+
+            if (walletDoc.exists && mounted) {
+              final wallet =
+                  Wallet.fromJson(walletDoc.data()!).copyWith(id: walletDoc.id);
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => WalletDetailScreen(
+                    wallet: wallet,
+                    onUpdate: () {},
+                    isSharedView: true,
+                  ),
+                ),
+              );
+            } else {
+              _showErrorSnackBar('This portfolio is no longer available');
+            }
+          } catch (e) {
+            _showErrorSnackBar('Error loading portfolio: $e');
+          }
+        }
+        break;
+
+      case NotificationService.LIKE_PORTFOLIO_TYPE:
+        // Portfolio beğeni bildirimi - profil sayfasına git
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ShownProfileScreen(userId: senderId),
+          ),
+        );
+        break;
     }
   }
 
-  String _formatTimeAgo(Timestamp? timestamp) {
-    if (timestamp == null) return 'Just now';
-
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final difference = now.difference(date);
-
-    if (difference.inMinutes < 1) {
-      return 'Just now';
-    } else if (difference.inHours < 1) {
-      return '${difference.inMinutes}m ago';
-    } else if (difference.inDays < 1) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
-    } else {
-      return '${date.day}/${date.month}/${date.year}';
+  void _showErrorSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
     }
   }
 }
