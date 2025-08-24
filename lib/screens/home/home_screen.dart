@@ -1,8 +1,11 @@
-import 'package:bullbearnews/screens/home/notification_screen.dart';
 import 'package:bullbearnews/screens/home/search_user_screen.dart';
 import 'package:bullbearnews/services/notification_service.dart';
 import 'package:bullbearnews/widgets/home/action_button.dart';
+import 'package:bullbearnews/widgets/home/empty_state_widget.dart';
+import 'package:bullbearnews/widgets/home/error_state_widget.dart';
 import 'package:bullbearnews/widgets/home/is_loading.dart';
+import 'package:bullbearnews/widgets/home/logo_section_widget.dart';
+import 'package:bullbearnews/widgets/home/notification_button_widget.dart';
 import 'package:bullbearnews/widgets/news_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -13,7 +16,7 @@ class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
@@ -21,14 +24,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   final NotificationService _notificationService = NotificationService();
   List<NewsModel> _allNews = [];
 
-  // Backend'deki crypto kategorilerine göre güncellendi
-  final List<Map<String, String>> _categories = [
+  // Constants for better maintainability
+  static const double _scrollThreshold = 50.0;
+  static const Duration _animationDuration = Duration(milliseconds: 300);
+  static const Duration _headerAnimationDuration = Duration(milliseconds: 1000);
+  static const Duration _categoryAnimationDuration =
+      Duration(milliseconds: 800);
+
+  // Backend crypto categories
+  static const List<Map<String, String>> _categories = [
     {'name': 'All', 'icon': '📰'},
     {'name': 'Breaking', 'icon': '🚨'},
     {'name': 'Bitcoin', 'icon': '₿'},
     {'name': 'Ethereum', 'icon': 'Ξ'},
     {'name': 'Altcoins', 'icon': '🪙'},
-    {'name': 'DeFi', 'icon': '🏦'},
+    {'name': 'DeFi', 'icon': '🦄'},
     {'name': 'NFT', 'icon': '🎨'},
     {'name': 'Blockchain', 'icon': '⛓️'},
     {'name': 'Trading', 'icon': '📈'},
@@ -36,8 +46,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     {'name': 'Regulation', 'icon': '⚖️'},
   ];
 
+  // State variables
   String _selectedCategory = 'All';
   bool _isLoading = true;
+  bool _isRefreshing = false;
+  String? _errorMessage;
+
+  // Controllers and animations
   final ScrollController _scrollController = ScrollController();
   final Map<String, List<NewsModel>> _newsCache = {};
 
@@ -50,7 +65,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   bool _isHeaderVisible = true;
   double _lastScrollOffset = 0;
-  static const double _scrollThreshold = 50.0;
 
   @override
   void initState() {
@@ -62,15 +76,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   void _initializeAnimations() {
     _headerAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: _headerAnimationDuration,
       vsync: this,
     );
     _categoryAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: _categoryAnimationDuration,
       vsync: this,
     );
     _hideAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: _animationDuration,
       vsync: this,
     );
 
@@ -89,8 +103,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
     _headerAnimationController.forward();
     _hideAnimationController.forward();
+
     Future.delayed(const Duration(milliseconds: 300), () {
-      _categoryAnimationController.forward();
+      if (mounted) {
+        _categoryAnimationController.forward();
+      }
     });
   }
 
@@ -100,24 +117,31 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       final scrollDelta = currentScrollOffset - _lastScrollOffset;
 
       if (scrollDelta > _scrollThreshold && _isHeaderVisible) {
-        // Scrolling down - hide header
-        setState(() {
-          _isHeaderVisible = false;
-        });
-        _hideAnimationController.reverse();
+        _hideHeader();
       } else if (scrollDelta < -_scrollThreshold && !_isHeaderVisible) {
-        // Scrolling up - show header
-        setState(() {
-          _isHeaderVisible = true;
-        });
-        _hideAnimationController.forward();
+        _showHeader();
       }
 
-      // Update when scroll direction changes significantly
       if (scrollDelta.abs() > _scrollThreshold) {
         _lastScrollOffset = currentScrollOffset;
       }
     });
+  }
+
+  void _hideHeader() {
+    if (!mounted) return;
+    setState(() {
+      _isHeaderVisible = false;
+    });
+    _hideAnimationController.reverse();
+  }
+
+  void _showHeader() {
+    if (!mounted) return;
+    setState(() {
+      _isHeaderVisible = true;
+    });
+    _hideAnimationController.forward();
   }
 
   @override
@@ -129,90 +153,118 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // Normal yükleme - cache'li
-  Future<void> _loadNews() async {
-    if (_newsCache.containsKey(_selectedCategory)) {
+  // Load news with better error handling
+  Future<void> _loadNews({bool forceRefresh = false}) async {
+    if (!forceRefresh && _newsCache.containsKey(_selectedCategory)) {
       setState(() {
         _allNews = _newsCache[_selectedCategory]!;
         _isLoading = false;
+        _errorMessage = null;
       });
       return;
     }
 
     if (mounted) {
-      setState(() => _isLoading = true);
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
     }
 
     try {
-      List<NewsModel> news;
-      if (_selectedCategory == 'All') {
-        news = await _newsService.getNews();
-      } else {
-        news = await _newsService.getNewsByCategory(_selectedCategory);
-      }
-
+      final news = await _getNewsForCategory();
       _newsCache[_selectedCategory] = news;
 
       if (mounted) {
         setState(() {
           _allNews = news;
+          _errorMessage = null;
         });
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Haber yükleme hatası: $e');
+        print('News loading error: $e');
+      }
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
       }
     } finally {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isRefreshing = false;
+        });
       }
     }
   }
 
-  // Pull to refresh - cache'i temizleyerek fresh data çek
-  Future<void> _refreshNews() async {
-    try {
-      List<NewsModel> news;
-      if (_selectedCategory == 'All') {
-        news = await _newsService.getNews();
-      } else {
-        news = await _newsService.getNewsByCategory(_selectedCategory);
-      }
+  Future<List<NewsModel>> _getNewsForCategory() async {
+    return _selectedCategory == 'All'
+        ? await _newsService.getNews()
+        : await _newsService.getNewsByCategory(_selectedCategory);
+  }
 
-      // Cache'i güncelle
+  // Refresh news with loading state
+  Future<void> _refreshNews() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      final news = await _getNewsForCategory();
       _newsCache[_selectedCategory] = news;
 
       if (mounted) {
         setState(() {
           _allNews = news;
+          _errorMessage = null;
         });
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Haber yenileme hatası: $e');
+        print('News refresh error: $e');
       }
-
-      // Hata mesajı
+      _showErrorSnackBar('Failed to refresh news: $e');
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error, color: Colors.white, size: 20),
-                const SizedBox(width: 8),
-                Expanded(child: Text('Failed to refresh news: $e')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        );
+        setState(() {
+          _isRefreshing = false;
+        });
       }
     }
+  }
+
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+      ),
+    );
+  }
+
+  void _onCategorySelected(String categoryName) {
+    if (categoryName == _selectedCategory) return;
+
+    setState(() => _selectedCategory = categoryName);
+    _loadNews();
   }
 
   @override
@@ -225,34 +277,35 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       body: SafeArea(
         child: Column(
           children: [
-            AnimatedBuilder(
-              animation: _hideAnimation,
-              builder: (context, child) {
-                return ClipRect(
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    heightFactor: _hideAnimation.value,
-                    child: Transform.translate(
-                      offset: Offset(0, -50 * (1 - _hideAnimation.value)),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _buildHeader(isDark),
-                          _buildCategoryFilter(isDark),
-                          // NotificationDebugWidget()
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-            Expanded(
-              child: _buildNewsList(isDark),
-            ),
+            _buildAnimatedHeader(isDark),
+            Expanded(child: _buildNewsList(isDark)),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAnimatedHeader(bool isDark) {
+    return AnimatedBuilder(
+      animation: _hideAnimation,
+      builder: (context, child) {
+        return ClipRect(
+          child: Align(
+            alignment: Alignment.topCenter,
+            heightFactor: _hideAnimation.value,
+            child: Transform.translate(
+              offset: Offset(0, -50 * (1 - _hideAnimation.value)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildHeader(isDark),
+                  _buildCategoryFilter(isDark),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -268,83 +321,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Row(
                 children: [
-                  // Logo and Title
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF393E46),
-                                    const Color(0xFF948979),
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'BBN',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFFDFD0B8),
-                                  letterSpacing: 1.5,
-                                  fontFamily: 'DMSerif',
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'BullBearNews',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: isDark
-                                    ? const Color(0xFFDFD0B8)
-                                    : const Color(0xFF222831),
-                                letterSpacing: -0.5,
-                                fontFamily: 'DMSerif',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Your crypto news destination 🚀',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: isDark
-                                ? const Color(0xFF948979)
-                                : const Color(0xFF393E46),
-                            fontWeight: FontWeight.w500,
-                            fontFamily: 'DMSerif',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Action buttons
-                  Row(
-                    children: [
-                      ActionButton(
-                        icon: Icons.search_rounded,
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => SearchUserScreen()),
-                        ),
-                        isDark: isDark,
-                      ),
-                      const SizedBox(width: 8),
-                      _buildNotificationButton(isDark),
-                      const SizedBox(width: 8),
-                    ],
-                  ),
+                  Expanded(child: LogoSectionWidget(isDark: isDark)),
+                  _buildActionButtons(isDark),
                 ],
               ),
             ),
@@ -354,80 +332,24 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildNotificationButton(bool isDark) {
-    return StreamBuilder<int>(
-      stream: _notificationService.getUnreadNotificationCount(),
-      builder: (context, snapshot) {
-        final unreadCount = snapshot.data ?? 0;
-
-        return Stack(
-          children: [
-            Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF393E46).withOpacity(0.8)
-                    : Colors.white.withOpacity(0.9),
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const NotificationsScreen(),
-                    ),
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.notifications_outlined,
-                      color: isDark
-                          ? const Color(0xFFDFD0B8)
-                          : const Color(0xFF393E46),
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (unreadCount > 0)
-              Positioned(
-                right: 0,
-                top: 0,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 10,
-                    minHeight: 10,
-                  ),
-                  child: Text(
-                    unreadCount > 99 ? '99+' : unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'Roboto',
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
+  Widget _buildActionButtons(bool isDark) {
+    return Row(
+      children: [
+        ActionButton(
+          icon: Icons.search_rounded,
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => SearchUserScreen()),
+          ),
+          isDark: isDark,
+        ),
+        const SizedBox(width: 8),
+        NotificationButtonWidget(
+          isDark: isDark,
+          notificationService: _notificationService,
+        ),
+        const SizedBox(width: 8),
+      ],
     );
   }
 
@@ -446,83 +368,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 itemCount: _categories.length,
-                itemBuilder: (context, index) {
-                  final category = _categories[index];
-                  final categoryName = category['name']!;
-                  final categoryIcon = category['icon']!;
-                  final isSelected = categoryName == _selectedCategory;
-
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    margin: const EdgeInsets.only(right: 12),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () {
-                          setState(() => _selectedCategory = categoryName);
-                          _loadNews();
-                        },
-                        borderRadius: BorderRadius.circular(28),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 18, vertical: 12),
-                          decoration: BoxDecoration(
-                            gradient: isSelected
-                                ? LinearGradient(
-                                    colors: [
-                                      const Color(0xFF393E46),
-                                      const Color(0xFF948979),
-                                    ],
-                                  )
-                                : null,
-                            color: !isSelected
-                                ? (isDark
-                                    ? const Color(0xFF393E46).withOpacity(0.3)
-                                    : Colors.white.withOpacity(0.7))
-                                : null,
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.transparent
-                                  : (isDark
-                                      ? const Color(0xFF948979).withOpacity(0.3)
-                                      : const Color(0xFF393E46)
-                                          .withOpacity(0.2)),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                categoryIcon,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                categoryName,
-                                style: TextStyle(
-                                  color: isSelected
-                                      ? const Color(0xFFDFD0B8)
-                                      : (isDark
-                                          ? const Color(0xFF948979)
-                                          : const Color(0xFF393E46)),
-                                  fontWeight: isSelected
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  fontSize: 14,
-                                  fontFamily: 'DMSerif',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                itemBuilder: (context, index) =>
+                    _buildCategoryChip(index, isDark),
               ),
             ),
           ),
@@ -531,102 +378,101 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  Widget _buildCategoryChip(int index, bool isDark) {
+    final category = _categories[index];
+    final categoryName = category['name']!;
+    final categoryIcon = category['icon']!;
+    final isSelected = categoryName == _selectedCategory;
+
+    return AnimatedContainer(
+      duration: _animationDuration,
+      margin: const EdgeInsets.only(right: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _onCategorySelected(categoryName),
+          borderRadius: BorderRadius.circular(28),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: BoxDecoration(
+              gradient: isSelected
+                  ? const LinearGradient(
+                      colors: [Color(0xFF393E46), Color(0xFF948979)],
+                    )
+                  : null,
+              color: !isSelected
+                  ? (isDark
+                      ? const Color(0xFF393E46).withOpacity(0.3)
+                      : Colors.white.withOpacity(0.7))
+                  : null,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: isSelected
+                    ? Colors.transparent
+                    : (isDark
+                        ? const Color(0xFF948979).withOpacity(0.3)
+                        : const Color(0xFF393E46).withOpacity(0.2)),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(categoryIcon, style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+                Text(
+                  categoryName,
+                  style: TextStyle(
+                    color: isSelected
+                        ? const Color(0xFFDFD0B8)
+                        : (isDark
+                            ? const Color(0xFF948979)
+                            : const Color(0xFF393E46)),
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 14,
+                    fontFamily: 'DMSerif',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNewsList(bool isDark) {
+    // Show loading state
     if (_isLoading) {
-      IsLoading(isDark: isDark);
+      return IsLoading(isDark: isDark);
     }
 
-    if (_allNews.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF393E46).withOpacity(0.1),
-                    const Color(0xFF948979).withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Icon(
-                Icons.article_outlined,
-                size: 64,
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No ${_selectedCategory == 'All' ? 'crypto' : _selectedCategory} news',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '📱 Pull down to refresh for latest updates',
-              style: TextStyle(
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontSize: 14,
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _refreshNews,
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        const Color(0xFF393E46),
-                        const Color(0xFF948979),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.refresh_rounded,
-                        color: const Color(0xFFDFD0B8),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Refresh Now',
-                        style: TextStyle(
-                          color: const Color(0xFFDFD0B8),
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'DMSerif',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
+    // Show error state
+    if (_errorMessage != null) {
+      return ErrorStateWidget(
+        isDark: isDark,
+        errorMessage: _errorMessage,
+        onRetry: () => _loadNews(forceRefresh: true),
       );
     }
 
+    // Show empty state
+    if (_allNews.isEmpty) {
+      return EmptyStateWidget(
+        isDark: isDark,
+        isRefreshing: _isRefreshing,
+        refreshNews: _refreshNews,
+        selectedCategory: _selectedCategory,
+      );
+    }
+
+    // Show news list
+    return _buildNewsListView(isDark);
+  }
+
+  Widget _buildNewsListView(bool isDark) {
     return RefreshIndicator(
-      onRefresh: _refreshNews, // Değişti: _refreshNews kullanıyor
+      onRefresh: _refreshNews,
       color: isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
       backgroundColor:
           isDark ? const Color(0xFF393E46) : const Color(0xFFDFD0B8),
