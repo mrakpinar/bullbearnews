@@ -2,7 +2,7 @@ import 'package:bullbearnews/screens/home/search_user_screen.dart';
 import 'package:bullbearnews/services/notification_service.dart';
 import 'package:bullbearnews/widgets/home/action_button.dart';
 import 'package:bullbearnews/widgets/home/empty_state_widget.dart';
-import 'package:bullbearnews/widgets/home/error_state_widget.dart';
+import 'package:bullbearnews/widgets/error_state_widget.dart';
 import 'package:bullbearnews/widgets/home/is_loading.dart';
 import 'package:bullbearnews/widgets/home/logo_section_widget.dart';
 import 'package:bullbearnews/widgets/home/notification_button_widget.dart';

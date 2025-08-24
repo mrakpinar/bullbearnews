@@ -1,4 +1,4 @@
-import 'package:bullbearnews/widgets/home/error_state_widget.dart';
+import 'package:bullbearnews/widgets/error_state_widget.dart';
 import 'package:bullbearnews/widgets/news_details/app_bar_title.dart';
 import 'package:bullbearnews/widgets/news_details/author_card.dart';
 import 'package:bullbearnews/widgets/news_details/content_card.dart';
