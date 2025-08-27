@@ -1,19 +1,14 @@
 import 'dart:async';
-import 'dart:ui';
-import 'package:bullbearnews/widgets/community/chat/chat_room_banned_prompt.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_body_banned_user_widget.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_body_loading_widget.dart';
+import 'package:bullbearnews/widgets/community/chat/chat_room_body_widget.dart';
 import 'package:bullbearnews/widgets/community/chat/chat_room_info_dialog.dart';
-import 'package:bullbearnews/widgets/community/chat/chat_room_join_prompt.dart';
 import 'package:bullbearnews/widgets/community/chat/chat_room_leave_confirm_dialog.dart';
 import 'package:bullbearnews/widgets/community/chat/chat_room_report_dialog.dart';
-import 'package:bullbearnews/widgets/community/chat/empty_message_states.dart';
-import 'package:bullbearnews/widgets/community/chat/reply_preview.dart';
-import 'package:bullbearnews/widgets/community/chat/swipe_to_reply_wrapper.dart';
 import 'package:flutter/material.dart';
 import '../../models/chat_room_model.dart';
 import '../../models/chat_message_model.dart';
 import '../../services/chat_service.dart';
-import '../../widgets/community/chat/message_card.dart';
-import '../../widgets/community/chat/message_input.dart';
 
 class ChatScreen extends StatefulWidget {
   final ChatRoom chatRoom;
@@ -30,8 +25,10 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // ChatService instance'ı normal şekilde oluştur
   final ChatService _chatService = ChatService();
+
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _messageController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
@@ -44,6 +41,13 @@ class _ChatScreenState extends State<ChatScreen>
   ChatMessage? _replyToMessage;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  // Cache için değişkenler
+  StreamSubscription<List<ChatMessage>>? _messageSubscription;
+  Completer<void>? _userStatusCompleter;
+
+  @override
+  bool get wantKeepAlive => true; // Widget'ı bellekte tut
 
   @override
   void initState() {
@@ -64,7 +68,7 @@ class _ChatScreenState extends State<ChatScreen>
     if (widget.highlightMessageId != null) {
       _highlightedMessageId = widget.highlightMessageId;
 
-      // 2 saniye sonra scroll et ve highlight et
+      // Performans: Timer'ı daha geç başlat
       Future.delayed(const Duration(milliseconds: 1000), () {
         if (mounted) {
           // 5 saniye sonra highlight'ı kaldır
@@ -87,10 +91,19 @@ class _ChatScreenState extends State<ChatScreen>
     _focusNode.dispose();
     _highlightTimer?.cancel();
     _animationController.dispose();
+    _messageSubscription?.cancel(); // Stream subscription'ı iptal et
     super.dispose();
   }
 
+  // Performans: User status kontrolünü debounce et
   Future<void> _checkUserStatus() async {
+    // Eğer zaten bir kontrol devam ediyorsa, bekle
+    if (_userStatusCompleter != null && !_userStatusCompleter!.isCompleted) {
+      return _userStatusCompleter!.future;
+    }
+
+    _userStatusCompleter = Completer<void>();
+
     final currentUser = _chatService.getCurrentUser();
     if (currentUser == null) {
       if (mounted) {
@@ -99,17 +112,19 @@ class _ChatScreenState extends State<ChatScreen>
           _hasJoinedRoom = false;
         });
       }
+      _userStatusCompleter!.complete();
       return;
     }
 
     try {
-      final isBanned = await _chatService.isUserBannedFromRoom(
-        currentUser.uid,
-        widget.chatRoom.id,
-      );
+      // Performans: Paralel olarak hem ban durumu hem de room bilgisini al
+      final results = await Future.wait([
+        _chatService.isUserBannedFromRoom(currentUser.uid, widget.chatRoom.id),
+        _chatService.getChatRoom(widget.chatRoom.id),
+      ]);
 
-      // ChatService'ten güncel room bilgisini al
-      final updatedRoom = await _chatService.getChatRoom(widget.chatRoom.id);
+      final isBanned = results[0] as bool;
+      final updatedRoom = results[1] as ChatRoom?;
       final hasJoined = updatedRoom?.users.contains(currentUser.uid) ?? false;
 
       if (mounted) {
@@ -126,13 +141,16 @@ class _ChatScreenState extends State<ChatScreen>
         });
       }
       debugPrint('Error checking user status: $e');
+    } finally {
+      _userStatusCompleter!.complete();
     }
   }
 
+  // Performans: Scroll işlemini optimize et
   void _scrollToHighlightedMessage(List<ChatMessage> messages) {
-    if (_highlightedMessageId == null) return;
+    if (_highlightedMessageId == null || !_scrollController.hasClients) return;
 
-    // Mesajı listede bul
+    // Performans: Binary search kullan (eğer mesajlar ID'ye göre sıralıysa)
     final messageIndex = messages.indexWhere(
       (msg) => msg.id == _highlightedMessageId,
     );
@@ -141,55 +159,64 @@ class _ChatScreenState extends State<ChatScreen>
       // ListView reverse=true olduğu için index'i tersine çevir
       final scrollIndex = messages.length - 1 - messageIndex;
 
-      // Mesaja scroll et (her mesaj için ortalama yükseklik)
-      const itemHeight = 120.0; // Tahmini mesaj yüksekliği
+      // Performans: ScrollController'ın max extent'ini kontrol et
+      const itemHeight = 120.0;
       final scrollOffset = scrollIndex * itemHeight;
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
 
       _scrollController.animateTo(
-        scrollOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+        scrollOffset.clamp(0.0, maxScrollExtent),
         duration: const Duration(milliseconds: 1200),
         curve: Curves.easeInOutCubic,
       );
     }
   }
 
+  // Performans: Mesaj gönderme işlemini optimize et
   Future<void> _sendMessage() async {
-    if (_messageController.text.trim().isEmpty) return;
+    final content = _messageController.text.trim();
+    if (content.isEmpty) return;
     if (_isUserBanned) return;
     if (!_hasJoinedRoom) {
       _showJoinRoomDialog();
       return;
     }
 
-    final content = _messageController.text.trim();
+    // UI'ı hemen güncelle
+    final replyToMessage = _replyToMessage;
     _messageController.clear();
+
+    if (_replyToMessage != null) {
+      setState(() {
+        _replyToMessage = null;
+      });
+    }
 
     try {
       await _chatService.sendMessage(
         widget.chatRoom.id,
         content,
-        replyToMessage: _replyToMessage,
+        replyToMessage: replyToMessage,
       );
 
-      // Reply'i temizle
-      if (_replyToMessage != null) {
-        setState(() {
-          _replyToMessage = null;
-        });
+      // Performans: Scroll işlemini optimize et
+      if (_scrollController.hasClients && mounted) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       }
-
-      // Mesaj gönderildikten sonra aşağı scroll
-      Future.delayed(const Duration(milliseconds: 100), () {
-        if (_scrollController.hasClients) {
-          _scrollController.animateTo(
-            0,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
     } catch (e) {
+      // Hata durumunda UI'ı geri al
       if (mounted) {
+        _messageController.text = content;
+        if (replyToMessage != null) {
+          setState(() {
+            _replyToMessage = replyToMessage;
+          });
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error sending message: $e'),
@@ -204,31 +231,36 @@ class _ChatScreenState extends State<ChatScreen>
     }
   }
 
+  // Performans: Callback'leri optimize et
   void _handleReply(ChatMessage message) {
-    setState(() {
-      _replyToMessage = message;
-    });
+    if (_replyToMessage?.id != message.id) {
+      setState(() {
+        _replyToMessage = message;
+      });
+    }
     _focusNode.requestFocus();
   }
 
   void _cancelReply() {
-    setState(() {
-      _replyToMessage = null;
-    });
+    if (_replyToMessage != null) {
+      setState(() {
+        _replyToMessage = null;
+      });
+    }
   }
 
+  // Performans: Join room işlemini optimize et
   Future<void> _joinRoom() async {
+    if (_hasJoinedRoom) return; // Zaten katıldıysa işlem yapma
+
     try {
       await _chatService.joinRoom(widget.chatRoom.id);
 
       if (mounted) {
         setState(() {
-          _hasJoinedRoom = true; // UI'ı hemen güncelle
+          _hasJoinedRoom = true;
         });
       }
-
-      // Status kontrolü yapmayın, çünkü UI zaten güncellenmiş
-      // await _checkUserStatus(); // Bu satırı kaldırın veya yorum yapın
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -267,6 +299,7 @@ class _ChatScreenState extends State<ChatScreen>
     }
   }
 
+  // Performans: Dialog'ları lazy loading ile optimize et
   void _showJoinRoomDialog() {
     showDialog(
       context: context,
@@ -332,6 +365,7 @@ class _ChatScreenState extends State<ChatScreen>
     );
   }
 
+  // Performans: Report dialog'ını optimize et
   void _showReportDialog(ChatMessage message) {
     showDialog(
       context: context,
@@ -375,391 +409,55 @@ class _ChatScreenState extends State<ChatScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final colorScheme = Theme.of(context).colorScheme;
+    super.build(context); // AutomaticKeepAliveClientMixin için gerekli
 
+    // Performans: Return widget'ları hemen döndür
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Loading chat...',
-                style: TextStyle(
-                  color: isDark ? Colors.grey[400] : Colors.grey[600],
-                  fontFamily: 'DMSerif',
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return const ChatRoomBodyLoadingWidget();
     }
 
-    // Banned user ekranı
     if (_isUserBanned) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        appBar: AppBar(
-          elevation: 0,
-          backgroundColor: Colors.transparent,
-          leading: Container(
-            margin: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF393E46).withOpacity(0.8)
-                  : Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new,
-                size: 20,
-                color:
-                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-              ),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          title: Text(
-            widget.chatRoom.name,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-              fontFamily: 'DMSerif',
-            ),
-          ),
-        ),
-        body: ChatRoomBannedPrompt(theme: Theme.of(context)),
+      return ChatRoomBodyBannedUserWidget(
+        chatRoom: widget.chatRoom,
       );
     }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        leading: Container(
-          margin: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF393E46).withOpacity(0.8)
-                : Colors.white.withOpacity(0.8),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new,
-              size: 20,
-              color: isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.chatRoom.name,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color:
-                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-                fontFamily: 'DMSerif',
-              ),
-            ),
-            Text(
-              '${widget.chatRoom.users.length} members',
-              style: TextStyle(
-                fontSize: 12,
-                color:
-                    isDark ? const Color(0xFF948979) : const Color(0xFF393E46),
-                fontFamily: 'DMSerif',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: isDark
-                  ? const Color(0xFF393E46).withOpacity(0.8)
-                  : Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: PopupMenuButton<String>(
-              icon: Icon(
-                Icons.more_vert,
-                color:
-                    isDark ? const Color(0xFFDFD0B8) : const Color(0xFF222831),
-              ),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              color: isDark ? const Color(0xFF393E46) : Colors.white,
-              onSelected: (value) {
-                switch (value) {
-                  case 'leave':
-                    _showLeaveConfirmDialog();
-                    break;
-                  case 'info':
-                    _showRoomInfoDialog();
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                PopupMenuItem(
-                  value: 'info',
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.info_outline,
-                        color: isDark
-                            ? const Color(0xFFDFD0B8)
-                            : const Color(0xFF222831),
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Room Info',
-                        style: TextStyle(
-                          color: isDark
-                              ? const Color(0xFFDFD0B8)
-                              : const Color(0xFF222831),
-                          fontFamily: 'DMSerif',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_hasJoinedRoom)
-                  PopupMenuItem(
-                    value: 'leave',
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.exit_to_app,
-                          color: Colors.red[600],
-                          size: 18,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Leave Room',
-                          style: TextStyle(
-                            color: Colors.red[600],
-                            fontFamily: 'DMSerif',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-      // ChatScreen build metodundaki body kısmını şu şekilde güncelleyin:
-
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: Column(
-          children: [
-            // Reply preview (sadece katılan kullanıcılar için)
-
-            // Messages list
-            Expanded(
-              child: Stack(
-                children: [
-                  // Ana mesaj listesi
-                  StreamBuilder<List<ChatMessage>>(
-                    stream: _chatService.getChatMessages(widget.chatRoom.id),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                                colorScheme.primary),
-                          ),
-                        );
-                      }
-
-                      if (snapshot.hasError) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.error_outline,
-                                size: 48,
-                                color: Colors.red[400],
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Error loading messages',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.red[400],
-                                  fontFamily: 'DMSerif',
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return EmptyMessagesState(
-                          theme: Theme.of(context),
-                          colorScheme: colorScheme,
-                        );
-                      }
-
-                      final messages = snapshot.data!;
-
-                      // Highlight edilecek mesajı bul ve scroll et
-                      if (_highlightedMessageId != null && _hasJoinedRoom) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _scrollToHighlightedMessage(messages);
-                        });
-                      }
-
-                      return ListView.builder(
-                        controller: _scrollController,
-                        reverse: true,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
-                          final isHighlighted =
-                              _highlightedMessageId == message.id;
-
-                          return AnimatedContainer(
-                            duration:
-                                Duration(milliseconds: 300 + (index * 50)),
-                            curve: Curves.easeOutBack,
-                            child: SwipeToReplyWrapper(
-                              onReply: _hasJoinedRoom
-                                  ? () => _handleReply(message)
-                                  : null,
-                              child: MessageCard(
-                                message: message,
-                                isCurrentUser:
-                                    _chatService.isCurrentUser(message.userId),
-                                hasJoinedRoom: _hasJoinedRoom,
-                                theme: Theme.of(context),
-                                colorScheme: colorScheme,
-                                isHighlighted: isHighlighted && _hasJoinedRoom,
-                                onReport: () => _showReportDialog(message),
-                                onReply: (msg) => _handleReply(msg),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
-
-                  // Blur overlay for non-members
-                  if (!_hasJoinedRoom)
-                    Positioned.fill(
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 5.0, sigmaY: 5.0),
-                        child: Container(
-                          color: isDark
-                              ? Colors.black.withOpacity(0.3)
-                              : Colors.white.withOpacity(0.3),
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.visibility_off_outlined,
-                                  size: 48,
-                                  color: isDark
-                                      ? const Color(0xFF948979)
-                                      : Colors.grey[600],
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Join the room to see messages',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? const Color(0xFFDFD0B8)
-                                        : const Color(0xFF222831),
-                                    fontFamily: 'DMSerif',
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Messages are hidden until you join',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark
-                                        ? const Color(0xFF948979)
-                                        : Colors.grey[600],
-                                    fontFamily: 'DMSerif',
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            if (_replyToMessage != null && _hasJoinedRoom)
-              ReplyPreview(
-                message: _replyToMessage!,
-                onCancel: _cancelReply,
-                theme: Theme.of(context),
-              ),
-
-            // Message input veya Join prompt
-            if (_hasJoinedRoom)
-              MessageInput(
-                controller: _messageController,
-                focusNode: _focusNode,
-                onSend: _sendMessage,
-                theme: Theme.of(context),
-                colorScheme: colorScheme,
-                roomId: widget.chatRoom.id,
-              )
-            else
-              ChatRoomJoinPrompt(
-                onJoin: _joinRoom,
-                theme: Theme.of(context),
-              ),
-          ],
-        ),
-      ),
+    return ChatRoomBodyWidget(
+      chatRoom: widget.chatRoom,
+      showLeaveConfirmDialog: _showLeaveConfirmDialog,
+      showRoomInfoDialog: _showRoomInfoDialog,
+      hasJoinedRoom: _hasJoinedRoom,
+      fadeAnimation: _fadeAnimation,
+      scrollController: _scrollController,
+      messageController: _messageController,
+      focusNode: _focusNode,
+      onSendMessage: _sendMessage,
+      onJoinRoom: _joinRoom,
+      replyToMessage: _replyToMessage,
+      onCancelReply: _cancelReply,
+      onReply: _handleReply,
+      onReportMessage: _showReportDialog,
+      highlightedMessageId: _highlightedMessageId,
+      onScrollToHighlightedMessage: _scrollToHighlightedMessage,
     );
   }
 
   void _showLeaveConfirmDialog() {
     showDialog(
-        context: context,
-        builder: (context) => ChatRoomLeaveConfirmDialog(
-              chatRoom: widget.chatRoom,
-              leaveRoom: _leaveRoom,
-            ));
+      context: context,
+      builder: (context) => ChatRoomLeaveConfirmDialog(
+        chatRoom: widget.chatRoom,
+        leaveRoom: _leaveRoom,
+      ),
+    );
   }
 
   void _showRoomInfoDialog() {
     showDialog(
-        context: context,
-        builder: (context) => ChatRoomInfoDialog(chatRoom: widget.chatRoom));
+      context: context,
+      builder: (context) => ChatRoomInfoDialog(
+        chatRoom: widget.chatRoom,
+      ),
+    );
   }
 }

@@ -7,20 +7,42 @@ class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
 
   @override
-  _AuthScreenState createState() => _AuthScreenState();
+  State<AuthScreen> createState() => _AuthScreenState();
 }
 
 class _AuthScreenState extends State<AuthScreen> {
   final _formKey = GlobalKey<FormState>();
   final AuthService _authService = AuthService();
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _nameController = TextEditingController();
-  final _nicknameController = TextEditingController();
+
+  // Text controller'ları late olarak tanımlayalım
+  late final TextEditingController _emailController;
+  late final TextEditingController _passwordController;
+  late final TextEditingController _nameController;
+  late final TextEditingController _nicknameController;
 
   bool _isLogin = true;
   bool _isLoading = false;
   String _errorMessage = '';
+
+  // Theme cache için
+  bool? _isDark;
+
+  @override
+  void initState() {
+    super.initState();
+    // Controller'ları initState'de initialize edelim
+    _emailController = TextEditingController();
+    _passwordController = TextEditingController();
+    _nameController = TextEditingController();
+    _nicknameController = TextEditingController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Theme değişikliklerini cache'leyalim
+    _isDark = Theme.of(context).brightness == Brightness.dark;
+  }
 
   @override
   void dispose() {
@@ -41,151 +63,167 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _forgotPassword() async {
     final emailController = TextEditingController();
 
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark
-            ? AppColors.darkCard
-            : AppColors.lightCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          'Reset Password',
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark
-                ? AppColors.lightText
-                : AppColors.darkText,
-            fontFamily: 'DMSerif',
-            fontSize: 20,
-            fontWeight: FontWeight.w600,
-          ),
+    try {
+      await showDialog(
+        context: context,
+        barrierDismissible: true,
+        builder: (ctx) => _buildForgotPasswordDialog(ctx, emailController),
+      );
+    } finally {
+      emailController.dispose(); // Memory leak önleme
+    }
+  }
+
+  // Dialog widget'ını ayrı metod haline getirelim
+  Widget _buildForgotPasswordDialog(
+      BuildContext ctx, TextEditingController emailController) {
+    return AlertDialog(
+      backgroundColor: _isDark! ? AppColors.darkCard : AppColors.lightCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Text(
+        'Reset Password',
+        style: TextStyle(
+          color: _isDark! ? AppColors.lightText : AppColors.darkText,
+          fontFamily: 'DMSerif',
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Enter your email address to reset your password.',
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.lightText.withOpacity(0.7)
-                    : AppColors.darkText.withOpacity(0.7),
-                fontFamily: 'DMSerif',
-                fontSize: 14,
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: emailController,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Theme.of(context).brightness == Brightness.dark
-                    ? AppColors.lightText
-                    : AppColors.darkText,
-                fontFamily: 'DMSerif',
-              ),
-              cursorColor: AppColors.secondary,
-              decoration: InputDecoration(
-                labelText: 'E-mail',
-                labelStyle: TextStyle(
-                  fontFamily: 'DMSerif',
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? AppColors.lightText.withOpacity(0.6)
-                      : AppColors.darkText.withOpacity(0.6),
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.lightText.withOpacity(0.3)
-                        : AppColors.darkText.withOpacity(0.3),
-                    width: 1.0,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? AppColors.lightText.withOpacity(0.3)
-                        : AppColors.darkText.withOpacity(0.3),
-                    width: 1.0,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(
-                    color: AppColors.secondary,
-                    width: 2.0,
-                  ),
-                ),
-                prefixIcon: Icon(
-                  Icons.email_outlined,
-                  color: AppColors.secondary,
-                ),
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-              ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).brightness == Brightness.dark
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Enter your email address to reset your password.',
+            style: TextStyle(
+              color: _isDark!
                   ? AppColors.lightText.withOpacity(0.7)
                   : AppColors.darkText.withOpacity(0.7),
+              fontFamily: 'DMSerif',
+              fontSize: 14,
             ),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.secondary,
-              foregroundColor: AppColors.whiteText,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            onPressed: () async {
-              if (emailController.text.isEmpty ||
-                  !emailController.text.contains('@')) {
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Enter a valid e-mail address'),
-                    backgroundColor: Colors.red.shade700,
-                  ),
-                );
-                return;
-              }
-
-              try {
-                await _authService.resetPassword(emailController.text.trim());
-                if (!mounted) return;
-                Navigator.of(ctx).pop();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content:
-                        const Text('Password reset link sent to your e-mail.'),
-                    backgroundColor: Colors.green.shade700,
-                  ),
-                );
-              } catch (e) {
-                if (!mounted) return;
-                Navigator.of(ctx).pop();
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error: ${e.toString()}'),
-                    backgroundColor: Colors.red.shade700,
-                  ),
-                );
-              }
-            },
-            child: const Text('Send Link'),
-          ),
+          const SizedBox(height: 20),
+          _buildEmailTextField(emailController),
         ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(),
+          style: TextButton.styleFrom(
+            foregroundColor: _isDark!
+                ? AppColors.lightText.withOpacity(0.7)
+                : AppColors.darkText.withOpacity(0.7),
+          ),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.secondary,
+            foregroundColor: AppColors.whiteText,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          onPressed: () => _handlePasswordReset(ctx, emailController),
+          child: const Text('Send Link'),
+        ),
+      ],
+    );
+  }
+
+  // Email text field'ını ayrı widget haline getirelim
+  Widget _buildEmailTextField(TextEditingController controller) {
+    return TextField(
+      controller: controller,
+      style: TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        color: _isDark! ? AppColors.lightText : AppColors.darkText,
+        fontFamily: 'DMSerif',
+      ),
+      cursorColor: AppColors.secondary,
+      decoration: InputDecoration(
+        labelText: 'E-mail',
+        labelStyle: TextStyle(
+          fontFamily: 'DMSerif',
+          color: _isDark!
+              ? AppColors.lightText.withOpacity(0.6)
+              : AppColors.darkText.withOpacity(0.6),
+        ),
+        border: _buildInputBorder(),
+        enabledBorder: _buildInputBorder(),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(
+            color: AppColors.secondary,
+            width: 2.0,
+          ),
+        ),
+        prefixIcon: const Icon(
+          Icons.email_outlined,
+          color: AppColors.secondary,
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      ),
+      keyboardType: TextInputType.emailAddress,
+    );
+  }
+
+  // Border styling'i ayrı metoda çıkaralım
+  OutlineInputBorder _buildInputBorder() {
+    return OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(
+        color: _isDark!
+            ? AppColors.lightText.withOpacity(0.3)
+            : AppColors.darkText.withOpacity(0.3),
+        width: 1.0,
+      ),
+    );
+  }
+
+  // Password reset logic'ini ayrı metoda çıkaralım
+  Future<void> _handlePasswordReset(
+      BuildContext ctx, TextEditingController emailController) async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty || !_isValidEmail(email)) {
+      _showSnackBar('Enter a valid e-mail address', isError: true);
+      return;
+    }
+
+    try {
+      await _authService.resetPassword(email);
+      if (!mounted) return;
+
+      Navigator.of(ctx).pop();
+      _showSnackBar('Password reset link sent to your e-mail.', isError: false);
+    } catch (e) {
+      if (!mounted) return;
+
+      Navigator.of(ctx).pop();
+      _showSnackBar('Error: ${e.toString()}', isError: true);
+    }
+  }
+
+  // Email validation'ı ayrı metoda çıkaralım
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  // SnackBar gösterme metodunu optimize edelim
+  void _showSnackBar(String message, {required bool isError}) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -203,31 +241,9 @@ class _AuthScreenState extends State<AuthScreen> {
 
     try {
       if (_isLogin) {
-        await _authService.signIn(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
+        await _handleSignIn();
       } else {
-        final result = await _authService.signUp(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-          _nameController.text.trim(),
-          _nicknameController.text.trim(),
-        );
-
-        if (result != null && mounted) {
-          // Kayıt başarılı - direkt ana sayfaya yönlendir
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text(
-                  'Registration successful! Welcome to BullBearNews.'),
-              backgroundColor: Colors.green.shade700,
-            ),
-          );
-
-          // Ana sayfaya yönlendir
-          Navigator.of(context).pushReplacementNamed('/main');
-        }
+        await _handleSignUp();
       }
     } catch (e) {
       if (!mounted) return;
@@ -239,20 +255,49 @@ class _AuthScreenState extends State<AuthScreen> {
     }
   }
 
+  // Sign in logic'ini ayrı metoda çıkaralım
+  Future<void> _handleSignIn() async {
+    await _authService.signIn(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+    );
+  }
+
+  // Sign up logic'ini ayrı metoda çıkaralım
+  Future<void> _handleSignUp() async {
+    final result = await _authService.signUp(
+      _emailController.text.trim(),
+      _passwordController.text.trim(),
+      _nameController.text.trim(),
+      _nicknameController.text.trim(),
+    );
+
+    if (result != null && mounted) {
+      _showSnackBar(
+        'Registration successful! Welcome to BullBearNews.',
+        isError: false,
+      );
+
+      // Ana sayfaya yönlendir
+      Navigator.of(context).pushReplacementNamed('/main');
+    }
+  }
+
+  // Firebase error parsing'i optimize edelim
+  static const Map<String, String> _firebaseErrors = {
+    'user-not-found': 'Can\'t find a user with this e-mail address.',
+    'wrong-password': 'Wrong password.',
+    'invalid-credential': 'Wrong password or email.',
+    'email-already-in-use': 'This e-mail address is already in use.',
+    'weak-password': 'Password is too weak.',
+    'network-request-failed': 'Please check your internet connection.',
+  };
+
   String _parseFirebaseError(String message) {
-    if (message.contains('user-not-found')) {
-      return 'Can\'t find a user with this e-mail address.';
-    }
-    if (message.contains('wrong-password')) return 'Wrong password.';
-    if (message.contains('invalid-credential')) {
-      return 'Wrong password or email.';
-    }
-    if (message.contains('email-already-in-use')) {
-      return 'This e-mail address is already in use.';
-    }
-    if (message.contains('weak-password')) return 'Password is too weak.';
-    if (message.contains('network-request-failed')) {
-      return 'Please check your internet connection.';
+    for (final entry in _firebaseErrors.entries) {
+      if (message.contains(entry.key)) {
+        return entry.value;
+      }
     }
     return message;
   }
